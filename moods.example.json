@@ -1,49 +1,75 @@
 {
   "light_moods": {
-    "salon": {
-      "uuid": "1dbbcc92-01ab-5571-ffffba1e5675f352",
+    "living_room": {
+      "uuid": "YOUR_LIGHT_CONTROLLER_UUID",
       "moods": {
         "bright": 777,
         "jasno": 777,
         "pelne": 777,
         "off": 778,
         "wylacz": 778,
+        "evening": 1,
         "wieczor": 1,
+        "dining": 2,
         "jedzenie": 2,
-        "obiad": 2,
-        "kolacja": 2,
+        "night": 3,
         "noc": 3,
-        "xbox": 4,
-        "gry": 4
+        "xbox": 4
       }
     },
-    "sypialnia": {
-      "uuid": "1db9e05e-000c-e8aa-ffffba1e5675f352",
+    "bedroom": {
+      "uuid": "YOUR_BEDROOM_LIGHT_CONTROLLER_UUID",
       "moods": {
         "bright": 777,
         "jasno": 777,
         "off": 778,
-        "wieczor": 1,
-        "ranek": 2,
-        "pobudka": 3,
-        "zasypianie": 4
-      }
-    },
-    "gabinet": {
-      "uuid": "1dbd1f79-031e-9ee5-ffffba1e5675f352",
-      "moods": {
-        "bright": 777,
-        "jasno": 777,
-        "off": 778,
-        "wieczor": 1,
-        "noc": 2,
-        "komputer": 3
+        "evening": 1,
+        "night": 2,
+        "morning": 3
       }
     }
   },
   "ventilation_controls": {
-    "gabinet": "1e58de28-006c-9572-ffffba1e5675f352",
-    "kuchnia": "1e6b4f7e-0264-5a76-ffffba1e5675f352",
-    "sypialnia": "1caad0b0-01cb-d5f3-ffff235f52b54327"
+    "office": "YOUR_VENTILATION_UUID",
+    "kitchen": "YOUR_VENTILATION_UUID",
+    "bedroom": "YOUR_VENTILATION_UUID"
+  },
+  "audio_zones": {
+    "living_room": "YOUR_AUDIO_ZONE_UUID",
+    "kitchen": "YOUR_AUDIO_ZONE_UUID",
+    "bedroom": "YOUR_AUDIO_ZONE_UUID",
+    "office": "YOUR_AUDIO_ZONE_UUID"
+  },
+  "ac_units": {
+    "living_room": "YOUR_AC_UNIT_UUID",
+    "bedroom": "YOUR_AC_UNIT_UUID",
+    "office": "YOUR_AC_UNIT_UUID"
+  },
+  "cleaning_commands": {
+    "vacuum": "YOUR_CLEANING_TRIGGER_UUID",
+    "mop": "YOUR_MOPPING_TRIGGER_UUID",
+    "kitchen": "YOUR_KITCHEN_CLEANING_UUID",
+    "hallway": "YOUR_HALLWAY_CLEANING_UUID"
+  },
+  "irrigation": {
+    "balcony": "YOUR_BALCONY_WATERING_UUID",
+    "tank": "YOUR_TANK_WATERING_UUID",
+    "tap": "YOUR_TAP_WATERING_UUID",
+    "disable": "YOUR_WATERING_DISABLE_SWITCH_UUID"
+  },
+  "switches": {
+    "away_mode": "YOUR_AWAY_MODE_SWITCH_UUID",
+    "hot_water": "YOUR_HOT_WATER_SWITCH_UUID",
+    "snow_block": "YOUR_SNOW_BLOCK_SWITCH_UUID"
+  },
+  "windows_control": {
+    "open": "YOUR_WINDOW_OPEN_UUID",
+    "close": "YOUR_WINDOW_CLOSE_UUID"
+  },
+  "intercom": {
+    "door": "YOUR_INTERCOM_UUID"
+  },
+  "alarm": {
+    "burglar": "YOUR_ALARM_UUID"
   }
 }

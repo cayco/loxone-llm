@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph SmartHome["Smart Home Hardware"]
-        Miniserver["Loxone Miniserver\n(LightControllerV2, Ventilation,\nJalousie, Sensors, HVAC)"]
+        Miniserver["Loxone Miniserver\n(LightControllerV2, AudioZone, AcControl,\nVentilation, Jalousie, Robots, Irrigation, Sensors)"]
     end
 
     Siri -->|Voice / Text| VoiceAssist
@@ -48,7 +48,7 @@ flowchart TD
     Bridge <-->|Chat + Tools Schema| Gemini
     Bridge <-->|MCP Tools JSON-RPC| MCP
     MCP -->|HTTP / WebSocket API| Miniserver
-    Bridge -.->|Direct HTTP Fallback / setTimer| Miniserver
+    Bridge -.->|Direct HTTP Fallback / setTimer / Pulses| Miniserver
 ```
 
 ---
@@ -62,16 +62,30 @@ flowchart TD
 - **💡 Smart Lighting & Gen 2 Moods**:
   - Room-level control: *"Turn on lights in the living room"*, *"Turn off bedroom lights"*.
   - Full support for Loxone Gen 2 (`LightControllerV2`) predefined scenes and moods: *"Evening in the living room"*, *"Night mode in the bedroom"*, *"Dining mode"*, *"Xbox mode"*, *"Bright lights in kitchen"*.
-- **🍃 Ventilation & Recuperation with Timers**:
+- **🎵 Multiroom Audio (`AudioZone`)**:
+  - Play, pause, stop, next/prev track, volume adjustments (0-100%), and mute/unmute.
+  - Per-room or whole-house broadcast: *"Play music in the kitchen"*, *"Stop audio in the entire house"*, *"Set office volume to 30%"*.
+- **❄️ Air Conditioning (`AcControl`)**:
+  - Direct control of AC split units (Salon, Sypialnia, Gabinet, Filip, Maciek): *"Turn on AC in the bedroom"*, *"Set living room AC to cooling 21 degrees"*, *"Turn off all AC units"*.
+- **🍃 Timed Ventilation & Recuperation (`Ventilation`)**:
   - Control room units or whole-house ventilation: Office, Kitchen, Bedroom, Entire house.
   - Native Loxone timers with duration: *"Air out the kitchen for 30 minutes"*, *"Set ventilation to 60% for 1 hour"*, *"Turn off ventilation for 2 hours"*.
   - Automatic fallback to safe auto mode after the timer expires.
-- **🪟 Blinds & Shading**:
-  - Full support for Jalousie blocks: *"Close living room blinds"*, *"Open office blinds"*.
+- **🤖 Robot Vacuum Cleaners & Zone Cleaning**:
+  - Trigger robot runs by voice: *"Send Mietek to clean the kitchen"*, *"Start mopping"*, *"Clean the hallway downstairs"*.
+- **🪴 Garden & Balcony Irrigation (`Irrigation`)**:
+  - Balcony watering, rainwater tank, or tap watering: *"Water the balcony"*, *"Start irrigation from tank"*, *"Disable watering"*.
+- **🪟 Automated Windows & Shading (`Jalousie` & Windows)**:
+  - Roof/façade windows: *"Open windows in the house"*, *"Close all windows"*.
+  - Blinds/shutters: *"Close living room blinds"*, *"Open office blinds"*.
+- **🔔 Intercom, Gates & Doors (`Intercom`)**:
+  - Open entrance gate or pedestrian wicket door: *"Open the gate"*, *"Open the front wicket"*.
+- **🔘 Smart Home Switches & Modes**:
+  - Global house state toggles: *"We are leaving home (away mode)"*, *"Turn on hot water"*, *"Enable snow protection block"*.
 - **📊 Real-time Sensor & Energy Inquiries**:
   - Digital window/door contact sensors: *"Which windows are open?"*.
   - Live power meters: *"How much power are we using right now?"*.
-  - Temperatures, humidity, and room controllers: *"What is the temperature in the office?"*.
+  - Temperatures, humidity, and burglar alarm status.
 - **🔒 Zero Leakage Security**:
   - Miniserver credentials stay strictly on your local network.
   - Fully configurable via environment variables (`.env`). No usernames or passwords are hardcoded.
@@ -167,39 +181,23 @@ Open the following URL in your browser (substituting your credentials and Minise
 ```
 http://<LOXONE_USER>:<LOXONE_PASS>@<LOXONE_HOST>/data/LoxAPP3.json
 ```
-1. Search the JSON for `"type": "LightControllerV2"`.
-2. Locate the controller for your room (e.g. Living Room / Salon).
-3. The block's UUID is under the `"uuidAction"` field (e.g. `1dbbcc92-01ab-5571-ffffba1e5675f352`).
-4. Look under the `"details"` object:
-   - `"moods"` contains an array of mood objects with `"id"` (e.g. `1`, `2`, `3`) and `"name"` (e.g. `"Wieczór"`, `"Jedzenie"`, `"Xbox"`).
-
-### Method 2: Inspect via Loxone Config
-1. Open your project file in **Loxone Config**.
-2. Click on the **Light Controller V2** block for the desired room.
-3. In the block properties or when double-clicking to configure moods, each mood entry displays its sequence index/ID.
-4. The control's UUID is displayed in the lower properties pane under **Identification**.
+1. Search the JSON for `"type": "LightControllerV2"`, `"AudioZone"`, `"AcControl"`, etc.
+2. The block's UUID is under the `"uuidAction"` field.
+3. For Light Controllers, look under `"details"` $\rightarrow$ `"moods"` for the list of `"id"` and `"name"` pairs.
 
 ### Configure `moods.json`
 Copy [`moods.example.json`](moods.example.json) to `moods.json` and fill in your discovered UUIDs and IDs:
 ```json
 {
-  "light_moods": {
-    "living room": {
-      "uuid": "YOUR_LIGHT_CONTROLLER_UUID",
-      "moods": {
-        "bright": 777,
-        "off": 778,
-        "evening": 1,
-        "dining": 2,
-        "night": 3,
-        "xbox": 4
-      }
-    }
-  },
-  "ventilation_controls": {
-    "office": "YOUR_VENTILATION_UUID",
-    "kitchen": "YOUR_VENTILATION_UUID"
-  }
+  "light_moods": { ... },
+  "ventilation_controls": { ... },
+  "audio_zones": { ... },
+  "ac_units": { ... },
+  "cleaning_commands": { ... },
+  "irrigation": { ... },
+  "switches": { ... },
+  "windows_control": { ... },
+  "intercom": { ... }
 }
 ```
 
@@ -237,12 +235,15 @@ Copy [`moods.example.json`](moods.example.json) to `moods.json` and fill in your
 |---|---|---|
 | **Lighting** | *"Turn on lights in the office"* | Turns on lighting in the specified room |
 | **Moods / Scenes** | *"Evening mode in the living room"* | Activates Evening mood (ID 1) on LightControllerV2 |
-| **Moods / Scenes** | *"Dining mode in living room"* | Activates Dining mood (ID 2) |
-| **Moods / Scenes** | *"Night in bedroom"* | Activates Night scene in the bedroom |
-| **Ventilation** | *"Air out the office"* | Runs 100% boost speed for default 15 minutes |
-| **Ventilation with Timer** | *"Air out kitchen for 30 minutes"* | Sets airing timer for 30 minutes |
-| **Ventilation** | *"Set ventilation to 60% for an hour"* | Sets speed to 60% for 60 minutes |
-| **Ventilation** | *"Set ventilation to automatic"* | Resets ventilation units back to automatic mode |
+| **Multiroom Audio** | *"Play music in the kitchen"* | Starts audio playback in the kitchen zone |
+| **Multiroom Audio** | *"Turn down the volume in the office"* | Reduces audio zone volume |
+| **Air Conditioning** | *"Turn on AC in the bedroom to 21 degrees"* | Enables cooling at target temperature |
+| **Ventilation** | *"Air out kitchen for 30 minutes"* | Sets airing timer for 30 minutes |
+| **Robot Cleaning** | *"Send Mietek to clean the kitchen"* | Starts robot vacuum cleaning in kitchen |
+| **Irrigation** | *"Water the balcony"* | Triggers balcony watering cycle |
+| **Windows** | *"Open the windows"* | Pulses roof/façade automated window actuators |
+| **Gates / Intercom** | *"Open the front wicket gate"* | Triggers intercom door opener relay |
+| **House Modes** | *"We are leaving the house"* | Toggles away mode switch (`poza domem`) |
 | **Blinds / Shading** | *"Close living room blinds"* | Lowers living room blinds (`FullDown`) |
 | **Sensors** | *"Which windows are open?"* | Checks open door/window reed sensors |
 | **Energy** | *"How much power are we using right now?"* | Queries live power draw from main energy meter |

@@ -1,8 +1,20 @@
 #!/usr/bin/env python3
 """
 Loxone LLM Bridge (OpenAI-compatible Agent for Home Assistant & Siri)
-Enables voice control of Loxone Miniservers using LLMs (Google Gemini / OpenAI)
+Enables voice and text control of Loxone Miniservers using LLMs (Google Gemini / OpenAI)
 and MCP (Model Context Protocol). Supports English (default) and Polish.
+Includes full support for:
+- Lighting & Gen 2 Moods (LightControllerV2)
+- Multiroom Audio (AudioZone: play, pause, volume, mute)
+- Air Conditioning (AcControl: on/off, cooling, heating, target temperature)
+- Timed Ventilation & Recuperation (Ventilation with setTimer)
+- Blinds & Shading (Jalousie)
+- Robot Vacuums / Cleaning (Pushbutton triggers for Mietek, Mopek, Kitchen, Hallway)
+- Garden & Balcony Irrigation (Irrigation, Pushbutton, Switch)
+- Automated Roof / Façade Windows (Open / Close pushbuttons)
+- Smart Home Switches & Modes (Away mode, Snow block, Hot/Cold water)
+- Entrance, Intercom & Gates (Intercom pulse outputs)
+- Sensors, Burglar Alarm & Power Meters
 """
 
 import os
@@ -60,7 +72,7 @@ gemini_client: Optional[AsyncOpenAI] = None
 # System Instructions by language
 SYSTEM_INSTRUCTIONS = {
     "en": (
-        "You are an intelligent smart home assistant for a Loxone smart home named Home. "
+        "You are an intelligent voice assistant for a Loxone smart home named Home. "
         "You respond to the user and control the home using available Loxone tools. "
         "Rules: "
         "1. Always respond in English. "
@@ -68,13 +80,20 @@ SYSTEM_INSTRUCTIONS = {
         "3. Do not use markdown formatting (no asterisks, bolding, tables, or numbered lists). "
         "4. When the user requests an action, ALWAYS call the appropriate tool first: "
         "   - turn on/off or dim lights: control_lights "
-        "   - activate lighting mood or scene (e.g. 'evening in living room', 'night', 'dining', 'xbox', 'bright', 'relax'): activate_scene(scene=..., room=...) "
+        "   - activate lighting mood or scene (e.g. 'evening in living room', 'night', 'dining', 'xbox', 'bright'): activate_scene(scene=..., room=...) "
+        "   - control multiroom music/audio: control_audio(room=..., action='play'|'pause'|'stop'|'volume'|'volumedown'|'volumeup'|'next'|'prev', volume=...) "
+        "   - control air conditioning: control_ac(room=..., action='on'|'off'|'cool'|'heat'|'auto', target_temp=...) "
+        "   - control ventilation/recuperation/airing: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
         "   - control blinds/shading/shutters: control_blinds "
-        "   - control ventilation/airing/recuperation: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
-        "   - set target temperature: set_temperature "
+        "   - robot vacuum cleaners / cleaning: control_cleaning(target='mietek'|'mopek'|'kuchnia'|'korytarz'|'all', action='start'|'stop') "
+        "   - garden/balcony watering: control_irrigation(target='balkon'|'zbiornik'|'kran'|'all', action='on'|'off'|'pulse') "
+        "   - open/close automated roof/facade windows: control_windows(action='open'|'close') "
+        "   - intercom, gate and door opener: control_intercom(action='open_gate'|'open_wicket') "
+        "   - smart home switches & modes: control_switch(switch_name='poza domem'|'ciepla woda'|'blokada sniegowa'|'okap', state='on'|'off'|'toggle') "
+        "   - set target room temperature for heating: set_temperature "
         "5. When the user asks for airing or changing ventilation for a specific duration (e.g. 'for 20 minutes', 'for half an hour', 'for an hour', 'for 2 hours'), ALWAYS specify that in duration_minutes. "
-        "6. Sensor, energy, window, and door information is available in get_sensor_readings. "
-        "7. Always conclude with a single short spoken confirmation sentence (e.g. 'Turned on kitchen ventilation for 30 minutes.', 'Activated evening mood in the living room.')."
+        "6. Sensor, energy, power meters, window, door, and burglar alarm information is available in get_sensor_readings. "
+        "7. Always conclude with a single short spoken confirmation sentence (e.g. 'Turned on music in the kitchen.', 'Started kitchen cleaning with the robot.', 'Activated evening mood in the living room.')."
     ),
     "pl": (
         "Jestes inteligentnym asystentem inteligentnego domu Loxone o nazwie Dom. "
@@ -86,12 +105,19 @@ SYSTEM_INSTRUCTIONS = {
         "4. Gdy uzytkownik prosi o akcje, ZAWSZE najpierw wywolaj odpowiednie narzedzie: "
         "   - wlaczenie/wylaczenie/sciemnienie swiatla: control_lights "
         "   - wlaczenie nastroju/trybu swiatla (np. 'wieczor w salonie', 'noc', 'jedzenie', 'xbox', 'jasno', 'zasypianie', 'pobudka'): activate_scene(scene=..., room=...) "
-        "   - sterowanie roletami/zaluzjami: control_blinds "
+        "   - sterowanie muzyka / multiroom audio: control_audio(room=..., action='play'|'pause'|'stop'|'volume'|'volumedown'|'volumeup'|'next'|'prev', volume=...) "
+        "   - sterowanie klimatyzacja (AC): control_ac(room=..., action='on'|'off'|'cool'|'heat'|'auto', target_temp=...) "
         "   - sterowanie wentylacja/rekuperacja/wietrzeniem: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
-        "   - ustawienie temperatury: set_temperature "
+        "   - sterowanie roletami/zaluzjami: control_blinds "
+        "   - roboty sprzatajace / odkurzanie (Mietek, Mopek, sprzatanie kuchni, korytarza): control_cleaning(target='mietek'|'mopek'|'kuchnia'|'korytarz'|'all', action='start'|'stop') "
+        "   - podlewanie ogrodu i balkonu: control_irrigation(target='balkon'|'zbiornik'|'kran'|'all', action='on'|'off'|'pulse') "
+        "   - otwieranie / zamykanie okien dachowych i fasadowych: control_windows(action='open'|'close') "
+        "   - domofon, otwieranie furtki lub bramy: control_intercom(action='open_gate'|'open_wicket') "
+        "   - przelaczniki i tryby domowe (np. poza domem, ciepla woda, blokada sniegowa, okap): control_switch(switch_name=..., state='on'|'off'|'toggle') "
+        "   - ustawienie temperatury kaloryferow / ogrzewania: set_temperature "
         "5. Gdy uzytkownik prosi o wietrzenie lub zmiane wentylacji na okreslony czas (np. 'na 20 minut', 'na pol godziny', 'na godzine', 'na 2 godziny'), ZAWSZE podaj ten czas w duration_minutes. "
-        "6. Informacje o stanie okien, drzwi, energii i czujnikach sa dostepne w get_sensor_readings. "
-        "7. Zawsze na koniec odpowiedz krotkim zdaniem potwierdzajacym wykonanie akcji (np. 'Wlaczylem wietrzenie w kuchni na 30 minut.', 'Wlaczylem tryb wieczor w salonie.')."
+        "6. Informacje o stanie okien, drzwi, energii, alarmu i czujnikach sa dostepne w get_sensor_readings. "
+        "7. Zawsze na koniec odpowiedz krotkim zdaniem potwierdzajacym wykonanie akcji (np. 'Wlaczylem muzyke w kuchni.', 'Wyslalem Mietka do sprzatania kuchni.', 'Wlaczylem tryb wieczor w salonie.')."
     )
 }
 
@@ -113,87 +139,281 @@ def normalize_text(text: str) -> str:
         s = s.replace(k, v)
     return s
 
-# Optional external mood & ventilation mapping config (can be loaded from moods.json)
+# Optional external configuration from moods.json / config file
 CONFIG_MOODS_FILE = os.getenv("MOODS_CONFIG_FILE", "moods.json")
 LIGHT_MOODS: Dict[str, Any] = {}
 VENTILATION_CONTROLS: Dict[str, str] = {}
+AUDIO_ZONES: Dict[str, str] = {}
+AC_UNITS: Dict[str, str] = {}
+CLEANING_COMMANDS: Dict[str, str] = {}
+IRRIGATION_CONTROLS: Dict[str, str] = {}
+SWITCHES: Dict[str, str] = {}
+WINDOWS_CONTROLS: Dict[str, str] = {}
+INTERCOM_CONTROLS: Dict[str, str] = {}
+ALARM_CONTROLS: Dict[str, str] = {}
 
-if os.path.exists(CONFIG_MOODS_FILE):
-    try:
-        with open(CONFIG_MOODS_FILE) as f:
-            cfg = json.load(f)
-            LIGHT_MOODS = cfg.get("light_moods", {})
-            VENTILATION_CONTROLS = cfg.get("ventilation_controls", {})
-            logger.info(f"Loaded custom configuration from {CONFIG_MOODS_FILE}")
-    except Exception as e:
-        logger.warning(f"Failed to load {CONFIG_MOODS_FILE}: {e}")
+def load_custom_config():
+    global LIGHT_MOODS, VENTILATION_CONTROLS, AUDIO_ZONES, AC_UNITS, CLEANING_COMMANDS
+    global IRRIGATION_CONTROLS, SWITCHES, WINDOWS_CONTROLS, INTERCOM_CONTROLS, ALARM_CONTROLS
 
-def get_ventilation_tool_def(lang: str = "en") -> Dict[str, Any]:
-    if lang == "pl":
-        return {
+    # Try specific config file or fallback to moods.json in same dir
+    paths = [CONFIG_MOODS_FILE, "moods.json", "/etc/loxone-agent/moods.json"]
+    for p in paths:
+        if os.path.exists(p):
+            try:
+                with open(p) as f:
+                    cfg = json.load(f)
+                    LIGHT_MOODS = cfg.get("light_moods", {})
+                    VENTILATION_CONTROLS = cfg.get("ventilation_controls", {})
+                    AUDIO_ZONES = cfg.get("audio_zones", {})
+                    AC_UNITS = cfg.get("ac_units", {})
+                    CLEANING_COMMANDS = cfg.get("cleaning_commands", {})
+                    IRRIGATION_CONTROLS = cfg.get("irrigation", {})
+                    SWITCHES = cfg.get("switches", {})
+                    WINDOWS_CONTROLS = cfg.get("windows_control", {})
+                    INTERCOM_CONTROLS = cfg.get("intercom", {})
+                    ALARM_CONTROLS = cfg.get("alarm", {})
+                    logger.info(f"Loaded hardware configuration from {p}")
+                    return
+            except Exception as e:
+                logger.warning(f"Failed to load {p}: {e}")
+
+load_custom_config()
+
+def get_custom_tools_def(lang: str = "en") -> List[Dict[str, Any]]:
+    is_pl = (lang == "pl")
+    return [
+        # 1. Ventilation with duration
+        {
             "type": "function",
             "function": {
                 "name": "control_ventilation",
-                "description": "Sterowanie wentylacją i rekuperacją w pomieszczeniach lub w całym domu z możliwością określenia czasu trwania. Obsługuje intensywne wietrzenie (boost/airing), spoczynek/wyłączenie (off/resting), powrót do trybu automatycznego (auto) oraz ustawienie konkretnej prędkości w procentach (set_speed).",
+                "description": (
+                    "Sterowanie wentylacją i rekuperacją z możliwością określenia czasu trwania w minutach."
+                    if is_pl else
+                    "Control ventilation and recuperation units by room or whole house with optional duration timer."
+                ),
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "room": {
                             "type": "string",
-                            "description": "Nazwa pomieszczenia (np. 'Gabinet', 'Kuchnia', 'Sypialnia') lub 'all' / brak dla wszystkich pomieszczeń"
+                            "description": "Room name (e.g. 'Gabinet', 'Kuchnia', 'Sypialnia', 'Office', 'Kitchen') or 'all'"
                         },
                         "action": {
                             "type": "string",
                             "enum": ["boost", "airing", "off", "resting", "auto", "set_speed"],
-                            "description": "Akcja wentylacji: boost/airing (wietrzenie na 100%), off/resting (wyłączenie), auto (tryb automatyczny), set_speed (prędkość w %)"
+                            "description": "Action: boost/airing (100% boost), off/resting, auto (automatic mode), set_speed"
                         },
                         "duration_minutes": {
                             "type": "integer",
-                            "description": "Czas trwania akcji w minutach (np. 15, 20, 30, 45, 60 dla 1h, 120 dla 2h). Domyślnie 15 minut dla wietrzenia, 60 minut dla set_speed, 120 minut dla off."
+                            "description": "Duration in minutes (e.g. 15, 20, 30, 45, 60, 120)."
                         },
                         "speed": {
                             "type": "integer",
                             "minimum": 0,
                             "maximum": 100,
-                            "description": "Prędkość wentylatora w procentach (0-100) dla akcji set_speed"
+                            "description": "Fan speed percentage (0-100) for set_speed action"
                         }
                     },
                     "required": ["action"]
                 }
             }
-        }
-    return {
-        "type": "function",
-        "function": {
-            "name": "control_ventilation",
-            "description": "Control ventilation and recuperation units by room or whole house with optional duration timer. Supports boost/airing, off/resting, auto/reset mode, and set_speed in percent.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "room": {
-                        "type": "string",
-                        "description": "Room name (e.g. 'Office', 'Kitchen', 'Bedroom') or 'all' / omitted for all units"
+        },
+        # 2. Multiroom Audio
+        {
+            "type": "function",
+            "function": {
+                "name": "control_audio",
+                "description": (
+                    "Sterowanie strefami audio i odtwarzaniem muzyki w pomieszczeniach (Salon, Kuchnia, Sypialnia, Gabinet, Korytarz, Łazienka)."
+                    if is_pl else
+                    "Control multiroom audio zones and music playback (Living room, Kitchen, Bedroom, Office, Hallway, Bathroom)."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "room": {
+                            "type": "string",
+                            "description": "Room name (e.g. 'salon', 'kuchnia', 'sypialnia', 'gabinet', 'all')"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["play", "pause", "stop", "toggle", "next", "prev", "volume", "volumeup", "volumedown", "mute", "unmute"],
+                            "description": "Audio action to perform"
+                        },
+                        "volume": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Volume percentage (0-100) when action is 'volume'"
+                        }
                     },
-                    "action": {
-                        "type": "string",
-                        "enum": ["boost", "airing", "off", "resting", "auto", "set_speed"],
-                        "description": "Ventilation action: boost/airing (100% boost), off/resting (turn off), auto (automatic mode), set_speed (custom percentage)"
+                    "required": ["action"]
+                }
+            }
+        },
+        # 3. Air Conditioning (AC)
+        {
+            "type": "function",
+            "function": {
+                "name": "control_ac",
+                "description": (
+                    "Sterowanie klimatyzacją (AC) w pokojach (Salon, Sypialnia, Gabinet, Filip, Maciek): włączanie, wyłączanie, chłodzenie, grzanie, temperatura docelowa."
+                    if is_pl else
+                    "Control air conditioning (AC) units in rooms (Salon, Sypialnia, Gabinet, Filip, Maciek): power on/off, cooling, heating, target temperature."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "room": {
+                            "type": "string",
+                            "description": "Room or unit name (e.g. 'salon', 'sypialnia', 'gabinet', 'filip', 'maciek', 'all')"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["on", "off", "cool", "heat", "auto", "set_temp"],
+                            "description": "AC mode or power action"
+                        },
+                        "target_temp": {
+                            "type": "number",
+                            "description": "Target cooling/heating temperature in Celsius (e.g. 21.0, 22.5)"
+                        }
                     },
-                    "duration_minutes": {
-                        "type": "integer",
-                        "description": "Duration in minutes (e.g. 15, 20, 30, 45, 60 for 1h, 120 for 2h). Default is 15 min for airing, 60 min for speed, 120 min for off."
+                    "required": ["action"]
+                }
+            }
+        },
+        # 4. Robot Vacuums & Cleaning
+        {
+            "type": "function",
+            "function": {
+                "name": "control_cleaning",
+                "description": (
+                    "Uruchamianie sprzątania robotami (Mietek odkurzacz, Mopek mopowanie) lub sprzątanie konkretnych stref (kuchnia, korytarz na dole)."
+                    if is_pl else
+                    "Trigger robot vacuum and mop cleaning (Mietek vacuum, Mopek mop, or room cleaning for kitchen and hallway)."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "enum": ["mietek", "mopek", "kuchnia", "korytarz", "all"],
+                            "description": "Target robot or zone to clean: mietek (vacuum), mopek (mop), kuchnia (kitchen), korytarz (hallway)"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["start", "stop", "pulse"],
+                            "description": "Cleaning action (default is 'start')"
+                        }
                     },
-                    "speed": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 100,
-                        "description": "Fan speed percentage (0-100) for set_speed action"
-                    }
-                },
-                "required": ["action"]
+                    "required": ["target"]
+                }
+            }
+        },
+        # 5. Garden & Balcony Irrigation
+        {
+            "type": "function",
+            "function": {
+                "name": "control_irrigation",
+                "description": (
+                    "Sterowanie podlewaniem ogrodu i balkonu: podlewanie balkonowe, podlewanie ze zbiornika na deszczówkę lub z kranu."
+                    if is_pl else
+                    "Control garden and balcony irrigation: balcony watering, rainwater tank irrigation, or tap watering."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "target": {
+                            "type": "string",
+                            "enum": ["balkon", "zbiornik", "kran", "blokada", "all"],
+                            "description": "Watering target: balkon (balcony), zbiornik (rainwater tank), kran (tap), blokada (disable/enable irrigation)"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["on", "off", "pulse"],
+                            "description": "Action (default is 'pulse' for pushbutton, or 'on'/'off')"
+                        }
+                    },
+                    "required": ["target"]
+                }
+            }
+        },
+        # 6. Roof & Façade Windows
+        {
+            "type": "function",
+            "function": {
+                "name": "control_windows",
+                "description": (
+                    "Automatyczne otwieranie lub zamykanie okien w domu."
+                    if is_pl else
+                    "Open or close automated house windows."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["open", "close"],
+                            "description": "open (otwórz okna) or close (zamknij okna)"
+                        }
+                    },
+                    "required": ["action"]
+                }
+            }
+        },
+        # 7. Intercom, Gate & Wicket
+        {
+            "type": "function",
+            "function": {
+                "name": "control_intercom",
+                "description": (
+                    "Sterowanie domofonem, otwieranie furtki lub bramy wjazdowej."
+                    if is_pl else
+                    "Control intercom system to open the gate or entrance wicket door."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "enum": ["open_wicket", "open_gate"],
+                            "description": "open_wicket (otwórz furtkę), open_gate (otwórz bramę)"
+                        }
+                    },
+                    "required": ["action"]
+                }
+            }
+        },
+        # 8. Switches and System Modes
+        {
+            "type": "function",
+            "function": {
+                "name": "control_switch",
+                "description": (
+                    "Sterowanie przełącznikami i trybami domu: 'poza domem' (away mode), 'ciepla woda', 'zimna woda', 'blokada sniegowa', 'okap', 'otwarty balkon'."
+                    if is_pl else
+                    "Control smart home switches and operating modes: away mode ('poza domem'), hot water ('ciepla woda'), snow block, cooker hood, etc."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "switch_name": {
+                            "type": "string",
+                            "description": "Name of switch or mode (e.g. 'poza domem', 'ciepla woda', 'blokada sniegowa', 'okap')"
+                        },
+                        "state": {
+                            "type": "string",
+                            "enum": ["on", "off", "toggle"],
+                            "description": "Target state (on, off, toggle)"
+                        }
+                    },
+                    "required": ["switch_name", "state"]
+                }
             }
         }
-    }
+    ]
 
 def get_client() -> AsyncOpenAI:
     global gemini_client
@@ -216,18 +436,22 @@ async def fetch_mcp_tools(lang: str = "en") -> List[Dict[str, Any]]:
         data = resp.json()
         raw_tools = data.get("result", {}).get("tools", [])
         
+        custom_defs = get_custom_tools_def(lang)
+        custom_names = {c["function"]["name"] for c in custom_defs}
+
         openai_tools = []
         for t in raw_tools:
-            openai_tools.append({
-                "type": "function",
-                "function": {
-                    "name": t["name"],
-                    "description": t.get("description", ""),
-                    "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
-                }
-            })
-        # Add custom ventilation tool
-        openai_tools.append(get_ventilation_tool_def(lang))
+            # Avoid duplicate definitions if we provide a higher-level custom handler
+            if t["name"] not in custom_names:
+                openai_tools.append({
+                    "type": "function",
+                    "function": {
+                        "name": t["name"],
+                        "description": t.get("description", ""),
+                        "parameters": t.get("inputSchema", {"type": "object", "properties": {}})
+                    }
+                })
+        openai_tools.extend(custom_defs)
         return openai_tools
 
 async def call_mcp_raw(name: str, arguments: Dict[str, Any]) -> Any:
@@ -260,25 +484,20 @@ async def direct_miniserver_cmd(target_uuid: str, command: str) -> Dict[str, Any
         return {"success": False, "status": r.status_code, "error": r.text}
 
 async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
-    """Execute tool call with smart room/mood/ventilation handling and fallback."""
+    """Execute tool call with smart room/mood/hardware handling and fallback."""
     # 1. Custom handling for ventilation with duration support
     if name == "control_ventilation":
         action = arguments.get("action", "auto")
         room = normalize_text(arguments.get("room", "") or "")
         speed = arguments.get("speed", 100)
         
-        # Calculate duration in seconds
         dur_min = arguments.get("duration_minutes")
         if dur_min is not None:
-            try:
-                dur_sec = int(dur_min) * 60
-            except Exception:
-                dur_sec = None
+            try: dur_sec = int(dur_min) * 60
+            except Exception: dur_sec = None
         elif "duration" in arguments and arguments["duration"] is not None:
-            try:
-                dur_sec = int(arguments["duration"])
-            except Exception:
-                dur_sec = None
+            try: dur_sec = int(arguments["duration"])
+            except Exception: dur_sec = None
         else:
             dur_sec = None
 
@@ -308,7 +527,146 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
             results.append({"room": r_name, "command": cmd, "result": res})
         return {"success": True, "action": action, "duration_minutes": dur // 60 if "dur" in locals() else None, "results": results}
 
-    # 2. Scene / Mood activation handling (Gen 2 LightControllerV2 ID mapping)
+    # 2. Multiroom Audio control
+    if name == "control_audio":
+        action = arguments.get("action", "play")
+        room = normalize_text(arguments.get("room", "") or "")
+        vol = arguments.get("volume")
+
+        targets = []
+        for z_name, u in AUDIO_ZONES.items():
+            if not room or room in ("all", "wszystkie", "caly dom", "dom") or room in z_name or z_name in room:
+                targets.append((z_name, u))
+
+        if not targets and AUDIO_ZONES:
+            targets = list(AUDIO_ZONES.items())
+
+        cmd = "play"
+        if action == "pause": cmd = "pause"
+        elif action == "stop": cmd = "pause"
+        elif action == "toggle": cmd = "pause"
+        elif action == "next": cmd = "next"
+        elif action == "prev": cmd = "prev"
+        elif action == "volumeup": cmd = "volumeup"
+        elif action == "volumedown": cmd = "volumedown"
+        elif action == "mute": cmd = "mute"
+        elif action == "unmute": cmd = "unmute"
+        elif action == "volume" and vol is not None:
+            cmd = f"volume/{vol}"
+
+        results = []
+        for z_name, u in targets:
+            res = await direct_miniserver_cmd(u, cmd)
+            results.append({"zone": z_name, "command": cmd, "result": res})
+        return {"success": True, "action": action, "results": results}
+
+    # 3. Air Conditioning (AC) control
+    if name == "control_ac":
+        action = arguments.get("action", "on")
+        room = normalize_text(arguments.get("room", "") or "")
+        target_temp = arguments.get("target_temp")
+
+        targets = []
+        for ac_name, u in AC_UNITS.items():
+            if not room or room in ("all", "caly dom", "wszystkie") or room in ac_name or ac_name in room:
+                targets.append((ac_name, u))
+
+        if not targets and AC_UNITS:
+            targets = list(AC_UNITS.items())
+
+        cmd = "on"
+        if action == "off": cmd = "off"
+        elif action == "cool": cmd = "mode/2" # Loxone AC mode cooling
+        elif action == "heat": cmd = "mode/1" # Loxone AC mode heating
+        elif action == "auto": cmd = "mode/0"
+        elif action == "set_temp" and target_temp is not None:
+            cmd = f"setTargetTemp/{target_temp}"
+
+        results = []
+        for ac_name, u in targets:
+            res = await direct_miniserver_cmd(u, cmd)
+            if target_temp is not None and action != "set_temp":
+                await direct_miniserver_cmd(u, f"setTargetTemp/{target_temp}")
+            results.append({"unit": ac_name, "command": cmd, "result": res})
+        return {"success": True, "action": action, "results": results}
+
+    # 4. Robot Vacuums & Cleaning control
+    if name == "control_cleaning":
+        target = normalize_text(arguments.get("target", "all"))
+        action = arguments.get("action", "start")
+        cmd = "pulse" if action in ("start", "pulse") else "off"
+
+        targets = []
+        for c_name, u in CLEANING_COMMANDS.items():
+            if target in c_name or c_name in target or target == "all":
+                targets.append((c_name, u))
+
+        results = []
+        for c_name, u in targets:
+            res = await direct_miniserver_cmd(u, cmd)
+            results.append({"cleaning_target": c_name, "command": cmd, "result": res})
+        return {"success": True, "results": results}
+
+    # 5. Garden & Balcony Irrigation control
+    if name == "control_irrigation":
+        target = normalize_text(arguments.get("target", "balkon"))
+        action = arguments.get("action", "pulse")
+        cmd = "pulse" if action in ("start", "pulse") else action
+
+        targets = []
+        for i_name, u in IRRIGATION_CONTROLS.items():
+            if target in i_name or i_name in target or target == "all":
+                targets.append((i_name, u))
+
+        results = []
+        for i_name, u in targets:
+            res = await direct_miniserver_cmd(u, cmd)
+            results.append({"target": i_name, "command": cmd, "result": res})
+        return {"success": True, "results": results}
+
+    # 6. Roof & Façade Windows control
+    if name == "control_windows":
+        action = arguments.get("action", "open")
+        target_uuid = WINDOWS_CONTROLS.get(action)
+        if not target_uuid:
+            target_uuid = WINDOWS_CONTROLS.get("open" if action == "open" else "close")
+        if target_uuid:
+            res = await direct_miniserver_cmd(target_uuid, "pulse")
+            return {"success": True, "action": action, "result": res}
+        return {"success": False, "error": f"No window control configured for action '{action}'"}
+
+    # 7. Intercom, Gate & Wicket control
+    if name == "control_intercom":
+        action = arguments.get("action", "open_wicket")
+        intercom_uuid = INTERCOM_CONTROLS.get("domofon")
+        if not intercom_uuid and INTERCOM_CONTROLS:
+            intercom_uuid = list(INTERCOM_CONTROLS.values())[0]
+
+        if intercom_uuid:
+            # Loxone Intercom: output 0 is wicket, output 1 is gate
+            output_num = 1 if "gate" in action or "bram" in action else 0
+            res = await direct_miniserver_cmd(intercom_uuid, f"pulse/{output_num}")
+            return {"success": True, "action": action, "output": output_num, "result": res}
+        return {"success": False, "error": "Intercom not configured in moods.json"}
+
+    # 8. Switches and System Modes control
+    if name == "control_switch":
+        switch_name = normalize_text(arguments.get("switch_name", ""))
+        state = arguments.get("state", "toggle")
+
+        matched_uuid = None
+        for s_key, u in SWITCHES.items():
+            if s_key in switch_name or switch_name in s_key:
+                matched_uuid = u
+                break
+
+        if matched_uuid:
+            cmd = "pulse" if state == "toggle" else state
+            res = await direct_miniserver_cmd(matched_uuid, cmd)
+            return {"success": True, "switch": switch_name, "command": cmd, "result": res}
+        return {"success": False, "error": f"Switch '{switch_name}' not found"}
+
+    # 9. Scene / Mood activation handling (Gen 2 LightControllerV2 ID mapping)
     if name == "activate_scene":
         scene_raw = arguments.get("scene", "")
         room_raw = arguments.get("room", "")
@@ -346,7 +704,7 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
                     "miniserver_response": res
                 }
 
-    # 3. Standard MCP tool execution
+    # 10. Standard MCP tool execution
     result = await call_mcp_raw(name, arguments)
     is_err = isinstance(result, dict) and ("error" in result or result.get("isError"))
     if not is_err:

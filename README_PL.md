@@ -37,7 +37,7 @@ flowchart TD
     end
 
     subgraph SmartHome["Sprzęt Smart Home"]
-        Miniserver["Loxone Miniserver\n(LightControllerV2, Wentylacja,\nŻaluzje, Czujniki, HVAC)"]
+        Miniserver["Loxone Miniserver\n(LightControllerV2, AudioZone, AcControl,\nWentylacja, Żaluzje, Roboty, Podlewanie, Czujniki)"]
     end
 
     Siri -->|Głos / Tekst| VoiceAssist
@@ -48,7 +48,7 @@ flowchart TD
     Bridge <-->|Czat + schematy narzędzi| Gemini
     Bridge <-->|Narzędzia MCP JSON-RPC| MCP
     MCP -->|API HTTP / WebSocket| Miniserver
-    Bridge -.->|Bezpośredni fallback HTTP / setTimer| Miniserver
+    Bridge -.->|Bezpośredni fallback HTTP / setTimer / Impulsy| Miniserver
 ```
 
 ---
@@ -58,22 +58,35 @@ flowchart TD
 - **🌐 Wsparcie wielojęzyczne**:
   - Domyślny język angielski (`LANGUAGE=en`).
   - Natywna obsługa języka polskiego (`LANGUAGE=pl`).
-  - Prompty i formatowanie odpowiedzi dostosowane pod syntezatory mowy (czysty tekst bez gwiazdek markdown, hashy czy tabel).
-- **💡 Inteligentne oświetlenie i nastroje Gen 2**:
-  - Sterowanie na poziomie pomieszczenia: *„Włącz światło w salonie”*, *„Zgaś światła w sypialni”*.
-  - Pełne wsparcie dla predefiniowanych scen i nastrojów Loxone Gen 2 (`LightControllerV2`): *„Wieczór w salonie”*, *„Noc w sypialni”*, *„Tryb jedzenie w salonie”*, *„Xbox w salonie”*, *„Jasno w kuchni”*.
-- **🍃 Wentylacja i rekuperacja z timerami**:
-  - Sterowanie pojedynczymi pomieszczeniami lub całością: Gabinet, Kuchnia, Sypialnia, Cały dom.
-  - Natywne timery Loxone z czasem trwania: *„Przewietrz kuchnię na 30 minut”*, *„Ustaw wentylację na 60% na godzinę”*, *„Wyłącz wentylację na 2 godziny”*.
-  - Automatyczny powrót do bezpiecznego trybu automatycznego po upływie czasu.
-- **🪟 Rolety i żaluzje**:
-  - Pełna obsługa bloków Jalousie: *„Zasłoń rolety w salonie”*, *„Otwórz roletę w gabinecie”*.
-- **📊 Odczyt czujników i energii w czasie rzeczywistym**:
+  - Formatowanie odpowiedzi dostosowane pod syntezatory mowy (czysty tekst bez gwiazdek markdown, hashy czy tabel).
+- **💡 Inteligentne oświetlenie i nastroje Gen 2 (`LightControllerV2`)**:
+  - Sterowanie pokojowe: *„Włącz światło w salonie”*, *„Zgaś światła w sypialni”*.
+  - Sceny i nastroje: *„Wieczór w salonie”*, *„Noc w sypialni”*, *„Tryb jedzenie w salonie”*, *„Xbox w salonie”*, *„Jasno w kuchni”*.
+- **🎵 Multiroom Audio (`AudioZone`)**:
+  - Odtwarzanie, pauza, stop, następny/poprzedni utwór, zmiana głośności (0-100%), wyciszanie.
+  - Sterowanie strefowe lub całym domem: *„Włącz muzykę w kuchni”*, *„Zatrzymaj muzykę w całym domu”*, *„Ustaw głośność w gabinecie na 30%”*.
+- **❄️ Klimatyzacja (`AcControl`)**:
+  - Sterowanie jednostkami klimatyzacji (Salon, Sypialnia, Gabinet, Filip, Maciek): *„Włącz klimatyzację w sypialni”*, *„Ustaw klimę w salonie na chłodzenie 21 stopni”*, *„Wyłącz klimatyzację”*.
+- **🍃 Wentylacja i rekuperacja z timerami (`Ventilation`)**:
+  - Sterowanie pokojami lub całym domem z określonym czasem: *„Przewietrz kuchnię na 30 minut”*, *„Ustaw wentylację na 60% na godzinę”*, *„Wyłącz wentylację na 2 godziny”*.
+  - Automatyczny bezpieczny powrót do trybu auto po upływie czasu.
+- **🤖 Roboty sprzątające i strefy sprzątania**:
+  - Uruchamianie odkurzaczy i mopowania: *„Wyślij Mietka do kuchni”*, *„Włącz mopowanie”*, *„Posprzątaj korytarz na dole”*.
+- **🪴 Podlewanie i ogród (`Irrigation`)**:
+  - Podlewanie balkonu, ze zbiornika na deszczówkę lub z kranu: *„Podlej balkon”*, *„Włącz podlewanie ze zbiornika”*, *„Zablokuj podlewanie”*.
+- **🪟 Automatyczne okna dachowe i żaluzje**:
+  - Otwieranie/zamykanie siłowników okien: *„Otwórz okna w domu”*, *„Zamknij wszystkie okna”*.
+  - Rolety i żaluzje: *„Zasłoń rolety w salonie”*, *„Otwórz roletę w gabinecie”*.
+- **🔔 Domofon, brama i furtka (`Intercom`)**:
+  - Otwieranie elektrozamka furtki lub bramy wjazdowej: *„Otwórz furtkę”*, *„Otwórz bramę”*.
+- **🔘 Przełączniki i tryby domu (`Switch`)**:
+  - Globalne stany domu: *„Wychodzimy z domu”* (tryb poza domem), *„Włącz ciepłą wodę”*, *„Włącz blokadę śniegową”*.
+- **📊 Odczyt czujników, energii i alarmu w czasie rzeczywistym**:
   - Kontaktrony okienne i drzwiowe: *„Które okna są otwarte?”*.
   - Pomiar mocy na żywo: *„Ile prądu teraz zużywamy?”*.
-  - Pomiar temperatury, wilgotności i regulatory pokojowe: *„Jaka jest temperatura w gabinecie?”*.
+  - Temperatury, wilgotność oraz stan alarmu przeciwwłamaniowego.
 - **🔒 Bezpieczeństwo i prywatność**:
-  - Dane logowania do Miniservera pozostają wyłącznie w Twojej sieci lokalnej.
+  - Miniserver i poświadczenia pozostają wyłącznie w Twojej sieci lokalnej.
   - Pełna konfiguracja przez zmienne środowiskowe (`.env`). Żadne hasła ani loginy nie są na stałe w kodzie.
 
 ---
@@ -154,52 +167,26 @@ curl http://127.0.0.1:8000/v1/models
 
 ---
 
-## 🔍 Jak znaleźć ID nastrojów i UUID bloków Loxone
+## 🔍 Identyfikatory UUID i ID nastrojów Loxone
 
-W blokach Loxone Gen 2 (`LightControllerV2`) zmiana nastroju wymaga podania numerycznego ID poprzez komendę `changeTo/<id>` (np. `changeTo/1` dla Wieczoru, `changeTo/2` dla Jedzenia). Standardowe wbudowane tryby Loxone mają ID:
-- **`777`**: Jasno / Pełne włączenie (`jasno` / `bright`)
-- **`778`**: Wyłączenie (`wyłącz` / `off`)
-
-Aby odnaleźć ID i UUID w Twojej instalacji:
-
-### Metoda 1: Odczyt struktury JSON w przeglądarce
-Wpisz w przeglądarce adres Miniservera z danymi logowania:
-```
-http://<LOXONE_USER>:<LOXONE_PASS>@<LOXONE_HOST>/data/LoxAPP3.json
-```
-1. Wyszukaj w pliku ciąg `"type": "LightControllerV2"`.
-2. Odszukaj kontroler oświetlenia danego pokoju (np. Salon).
-3. UUID bloku znajduje się w polu `"uuidAction"` (np. `1dbbcc92-01ab-5571-ffffba1e5675f352`).
-4. W sekcji `"details"` znajdziesz tablicę `"moods"` z obiektami posiadającymi pola `"id"` (np. `1`, `2`, `3`) oraz `"name"` (np. `"Wieczór"`, `"Jedzenie"`, `"Xbox"`).
-
-### Metoda 2: Sprawdzenie w Loxone Config
-1. Otwórz projekt w programie **Loxone Config**.
-2. Kliknij blok **Sterownik oświetlenia V2** (Light Controller V2) wybranego pomieszczenia.
-3. W oknie konfiguracji nastrojów każdy nastrój ma przypisany numeryczny numer pozycji.
-4. UUID bloku widoczne jest w dolnym panelu właściwości w sekcji **Identyfikacja**.
-
-### Konfiguracja `moods.json`
-Skopiuj plik [`moods.example.json`](moods.example.json) do `moods.json` i uzupełnij go odnalezionymi identyfikatorami:
+Skopiuj plik [`moods.example.json`](moods.example.json) do `moods.json` i uzupełnij go identyfikatorami ze swojego Miniservera:
 ```json
 {
-  "light_moods": {
-    "salon": {
-      "uuid": "TUTAJ_UUID_STEROWNIKA_OSWIETLENIA",
-      "moods": {
-        "jasno": 777,
-        "wylacz": 778,
-        "wieczor": 1,
-        "jedzenie": 2,
-        "noc": 3,
-        "xbox": 4
-      }
-    }
-  },
-  "ventilation_controls": {
-    "gabinet": "TUTAJ_UUID_WENTYLACJI",
-    "kuchnia": "TUTAJ_UUID_WENTYLACJI"
-  }
+  "light_moods": { ... },
+  "ventilation_controls": { ... },
+  "audio_zones": { ... },
+  "ac_units": { ... },
+  "cleaning_commands": { ... },
+  "irrigation": { ... },
+  "switches": { ... },
+  "windows_control": { ... },
+  "intercom": { ... }
 }
+```
+
+Aby sprawdzić identyfikatory UUID swoich bloków w przeglądarce:
+```
+http://<LOXONE_USER>:<LOXONE_PASS>@<LOXONE_HOST>/data/LoxAPP3.json
 ```
 
 ---
@@ -236,12 +223,16 @@ Skopiuj plik [`moods.example.json`](moods.example.json) do `moods.json` i uzupe�
 |---|---|---|
 | **Oświetlenie** | *„Włącz światło w gabinecie”* | Włącza oświetlenie w danym pokoju |
 | **Nastroje / Sceny** | *„Wieczór w salonie”* | Aktywuje nastrój Wieczór (ID 1) na LightControllerV2 |
-| **Nastroje / Sceny** | *„Włącz tryb jedzenie w salonie”* | Aktywuje nastrój Jedzenie / Obiad (ID 2) |
-| **Nastroje / Sceny** | *„Noc w sypialni”* | Aktywuje scenę nocną w sypialni |
-| **Wentylacja** | *„Przewietrz gabinet”* | Uruchamia 100% obrotów na domyślne 15 minut |
+| **Multiroom Audio** | *„Włącz muzykę w kuchni”* | Rozpoczyna odtwarzanie w strefie kuchennej |
+| **Multiroom Audio** | *„Ścisz muzykę w gabinecie”* | Obniża głośność w strefie audio |
+| **Klimatyzacja (AC)** | *„Włącz klimę w sypialni na 21 stopni”* | Uruchamia chłodzenie klimatyzacji |
 | **Wentylacja z czasem** | *„Włącz wietrzenie w kuchni na 30 minut”* | Aktywuje timer rekuperacji na 30 minut |
-| **Wentylacja** | *„Ustaw wentylację na 60% na godzinę”* | Ustawia 60% prędkości na 60 minut |
-| **Wentylacja** | *„Ustaw wentylację na tryb automatyczny”* | Resetuje centrale wentylacyjne do trybu auto |
+| **Sprzątanie / Roboty** | *„Wyślij Mietka do kuchni”* | Uruchamia odkurzanie kuchni |
+| **Sprzątanie / Roboty** | *„Włącz mopowanie”* | Uruchamia robota mopującego |
+| **Podlewanie** | *„Podlej balkon”* | Uruchamia cykl podlewania skrzynek balkonowych |
+| **Okna** | *„Otwórz okna w domu”* | Uruchamia impuls otwarcia okien |
+| **Furtka / Domofon** | *„Otwórz furtkę”* | Przełącza przekaźnik elektrozamka furtki |
+| **Tryby domowe** | *„Wychodzimy z domu”* | Aktywuje przełącznik trybu nieobecności (`poza domem`) |
 | **Rolety** | *„Zasłoń rolety w salonie”* | Opuszcza rolety (Jalousie FullDown) |
 | **Czujniki** | *„Które okna są otwarte?”* | Sprawdza kontaktrony okienne |
 | **Energia** | *„Ile prądu teraz zużywamy?”* | Odczytuje aktualną moc z licznika głównego |
