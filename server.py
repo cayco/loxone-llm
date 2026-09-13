@@ -727,6 +727,23 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
 
     return result
 
+@app.get("/v1/tools")
+async def list_available_tools(lang: str = "pl"):
+    """List all available tools formatted for LLM engines or Home Assistant."""
+    return await fetch_mcp_tools(lang=lang)
+
+@app.post("/v1/tools/execute")
+async def execute_tool_endpoint(req: Request):
+    """Direct execution endpoint for Home Assistant LLM / REST actions."""
+    data = await req.json()
+    name = data.get("name") or data.get("tool") or data.get("function")
+    arguments = data.get("arguments") or data.get("params") or data.get("args") or {}
+    if not name:
+        raise HTTPException(status_code=400, detail="Missing 'name' of tool to execute")
+    logger.info(f"Direct HA tool execution: {name} with args {arguments}")
+    result = await execute_mcp_tool(name, arguments)
+    return {"success": True, "tool": name, "result": result}
+
 @app.get("/v1/models")
 async def list_models():
     """OpenAI-compatible models listing."""
