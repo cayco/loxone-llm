@@ -2,6 +2,8 @@
 
 > OpenAI-compatible AI Agent bridge for Loxone Miniserver, enabling natural Polish voice and text control via Home Assistant, Siri, iOS Shortcuts, and Apple Watch.
 
+[English (EN)](README.md) | [Polski (PL)](README_PL.md)
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green.svg)](https://www.python.org/)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-LiteLLM-blue)](https://www.home-assistant.io/integrations/litellm)
@@ -53,29 +55,29 @@ flowchart TD
 
 ## ✨ Features
 
-- **🗣️ Natural Polish Speech**: System prompts and output formatting tuned specifically for voice synthesizers (clean text without markdown asterisks, hashes, or tables).
+- **🗣️ Natural Polish Speech**: System prompts and response formatting tuned specifically for voice synthesizers (clean conversational text without markdown asterisks, hashes, or tables).
 - **💡 Smart Lighting & Gen 2 Moods**:
-  - Room-level control: *"Włącz światło w salonie"*, *"Zgaś światła w sypialni"*.
-  - Full support for Loxone Gen 2 (`LightControllerV2`) predefined scenes and moods: *"Wieczór w salonie"*, *"Noc w sypialni"*, *"Tryb jedzenie w salonie"*, *"Xbox w salonie"*, *"Jasno w kuchni"*.
+  - Room-level control: *"Włącz światło w salonie"* (Turn on lights in the living room), *"Zgaś światła w sypialni"* (Turn off bedroom lights).
+  - Full support for Loxone Gen 2 (`LightControllerV2`) predefined scenes and moods: *"Wieczór w salonie"* (Evening mood), *"Noc w sypialni"* (Night mood), *"Tryb jedzenie w salonie"* (Dining mood), *"Xbox w salonie"* (Xbox gaming mood), *"Jasno w kuchni"* (Bright mood).
 - **🍃 Ventilation & Recuperation with Timers**:
-  - Control room units or whole-house ventilation: Gabinet, Kuchnia, Sypialnia, Cały dom.
-  - Native Loxone timers with duration: *"Przewietrz kuchnię na 30 minut"*, *"Ustaw wentylację na 60% na godzinę"*, *"Wyłącz wentylację na 2 godziny"*.
+  - Control room units or whole-house ventilation: Office, Kitchen, Bedroom, Entire house.
+  - Native Loxone timers with duration: *"Przewietrz kuchnię na 30 minut"* (Air out kitchen for 30 minutes), *"Ustaw wentylację na 60% na godzinę"* (Set ventilation to 60% for 1 hour), *"Wyłącz wentylację na 2 godziny"* (Turn off ventilation for 2 hours).
   - Automatic fallback to safe auto mode after the timer expires.
 - **🪟 Blinds & Shading**:
-  - Full support for Jalousie blocks: *"Zasłoń rolety w salonie"*, *"Otwórz roletę w gabinecie"*.
+  - Full support for Jalousie blocks: *"Zasłoń rolety w salonie"* (Close living room blinds), *"Otwórz roletę w gabinecie"* (Open office blinds).
 - **📊 Real-time Sensor & Energy Inquiries**:
-  - Digital window/door contacts: *"Które okna są otwarte?"*.
-  - Live power meters: *"Ile prądu teraz zużywamy?"*.
-  - Temperatures, humidity, and room controllers: *"Jaka jest temperatura w gabinecie?"*.
+  - Digital window/door contact sensors: *"Które okna są otwarte?"* (Which windows are open?).
+  - Live power meters: *"Ile prądu teraz zużywamy?"* (How much power are we using right now?).
+  - Temperatures, humidity, and room controllers: *"Jaka jest temperatura w gabinecie?"* (What is the temperature in the office?).
 - **🔒 Zero Leakage Security**:
   - Miniserver credentials stay strictly on your local network.
-  - Configurable via environment variables (`.env`).
+  - Fully configurable via environment variables (`.env`).
 
 ---
 
 ## 🛠️ Prerequisites
 
-- **Loxone Miniserver** (Gen 1 or Gen 2) with network access.
+- **Loxone Miniserver** (Gen 1 or Gen 2) with local network access.
 - **Home Assistant** (2024.1+) with the official [LiteLLM integration](https://www.home-assistant.io/integrations/litellm).
 - **Google Gemini API Key** (from [Google AI Studio](https://aistudio.google.com/)).
 - **Linux host or Proxmox LXC Container** (Debian 12/13 or Ubuntu).
@@ -150,12 +152,12 @@ curl http://127.0.0.1:8000/v1/models
 
 ## 🏡 Home Assistant Configuration
 
-1. In Home Assistant, go to **Settings** $\rightarrow$ **Devices & Services** $\rightarrow$ **Add Integration**.
+1. In Home Assistant, navigate to **Settings** $\rightarrow$ **Devices & Services** $\rightarrow$ **Add Integration**.
 2. Search for **LiteLLM**.
 3. Fill in the connection settings:
    - **API Base**: `http://<YOUR_BRIDGE_IP>:8000/v1`
    - **API Key**: `dummy` (or any string)
-4. Go to **Settings** $\rightarrow$ **Voice Assistants** $\rightarrow$ **Home Assistant**:
+4. Navigate to **Settings** $\rightarrow$ **Voice Assistants** $\rightarrow$ **Home Assistant**:
    - Set **Conversation Agent** to **LiteLLM**.
    - Set **Language** to **Polish**.
 
@@ -163,34 +165,34 @@ curl http://127.0.0.1:8000/v1/models
 
 ## 📱 iOS, Siri & Apple Watch Setup
 
-Because Apple Siri does not support Polish natively, calling Siri via the side button defaults to English speech recognition. To speak Polish reliably:
+Because Apple Siri does not support Polish natively as a primary assistant, invoking Siri via the side button defaults to English speech recognition. To speak Polish reliably:
 
-### Option A: Apple Watch Assist Complication (Recommended for Watch)
+### Option A: Apple Watch Assist Complication (Recommended for Apple Watch)
 1. Install the **Home Assistant** app on Apple Watch.
 2. Add the **Assist** complication to your watch face.
 3. Tapping the complication opens the native microphone listening in Polish and routes directly to the agent.
 
 ### Option B: iOS Action Button / Back Tap
 1. On iPhone 15 Pro / 16: Go to **Settings** $\rightarrow$ **Action Button** $\rightarrow$ assign a Shortcut running Home Assistant Assist.
-2. On any iPhone: Go to **Settings** $\rightarrow$ **Accessibility** $\rightarrow$ **Touch** $\rightarrow$ **Back Tap** (double/triple tap).
+2. On any iPhone: Go to **Settings** $\rightarrow$ **Accessibility** $\rightarrow$ **Touch** $\rightarrow$ **Back Tap** (double or triple tap).
 
 ---
 
 ## 🗣️ Example Voice Commands
 
-| Category | Example Command (PL) | Description |
+| Category | Example Voice Command (Polish) | Action / Description |
 |---|---|---|
-| **Oświetlenie** | *„Włącz światło w gabinecie”* | Włącza oświetlenie w danym pokoju |
-| **Nastroje / Sceny** | *„Wieczór w salonie”* | Aktywuje nastrój Wieczór (ID 1) na LightControllerV2 |
-| **Nastroje / Sceny** | *„Włącz tryb jedzenie w salonie”* | Aktywuje nastrój Jedzenie / Obiad (ID 2) |
-| **Nastroje / Sceny** | *„Noc w sypialni”* | Aktywuje scenę nocną w sypialni |
-| **Wentylacja** | *„Przewietrz gabinet”* | Uruchamia 100% obrotów na domyślne 15 minut |
-| **Wentylacja z czasem** | *„Włącz wietrzenie w kuchni na 30 minut”* | Aktywuje timer rekuperacji na 30 minut |
-| **Wentylacja** | *„Ustaw wentylację na 60% na godzinę”* | Ustawia 60% prędkości na 60 minut |
-| **Wentylacja** | *„Ustaw wentylację na tryb automatyczny”* | Resetuje centrale wentylacyjne do trybu auto |
-| **Rolety** | *„Zasłoń rolety w salonie”* | Opuszcza rolety (Jalousie FullDown) |
-| **Czujniki** | *„Które okna są otwarte?”* | Sprawdza kontaktrony okienne |
-| **Energia** | *„Ile prądu teraz zużywamy?”* | Odczytuje aktualną moc z licznika głównego |
+| **Lighting** | *„Włącz światło w gabinecie”* | Turns on lighting in the specified room |
+| **Moods / Scenes** | *„Wieczór w salonie”* | Activates Evening mood (ID 1) on LightControllerV2 |
+| **Moods / Scenes** | *„Włącz tryb jedzenie w salonie”* | Activates Dining mood (ID 2) |
+| **Moods / Scenes** | *„Noc w sypialni”* | Activates Night scene in the bedroom |
+| **Ventilation** | *„Przewietrz gabinet”* | Runs 100% boost speed for default 15 minutes |
+| **Ventilation with Timer** | *„Włącz wietrzenie w kuchni na 30 minut”* | Sets airing timer for 30 minutes |
+| **Ventilation** | *„Ustaw wentylację na 60% na godzinę”* | Sets speed to 60% for 60 minutes |
+| **Ventilation** | *„Ustaw wentylację na tryb automatyczny”* | Resets ventilation units back to automatic mode |
+| **Blinds / Shading** | *„Zasłoń rolety w salonie”* | Lowers living room blinds (`FullDown`) |
+| **Sensors** | *„Które okna są otwarte?”* | Checks open door/window reed sensors |
+| **Energy** | *„Ile prądu teraz zużywamy?”* | Queries live power draw from main energy meter |
 
 ---
 
