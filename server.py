@@ -509,10 +509,10 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
 
         if action in ("boost", "airing"):
             dur = dur_sec if dur_sec else 900
-            cmd = f"setTimer/{dur}/100/2/-1"
+            cmd = f"setTimer/{dur}/100/2/1"
         elif action in ("off", "resting"):
             dur = dur_sec if dur_sec else 7200
-            cmd = f"setTimer/{dur}/0/2/-1"
+            cmd = f"setTimer/{dur}/0/2/0"
         elif action in ("auto", "reset"):
             cmd = "setTimer/reset"
         elif action == "set_speed":
