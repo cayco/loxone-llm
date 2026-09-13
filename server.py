@@ -178,11 +178,59 @@ def load_custom_config():
             except Exception as e:
                 logger.warning(f"Failed to load {p}: {e}")
 
+DEFAULT_LIGHT_CONTROLLERS: Dict[str, str] = {
+    "filip": "1db945ce-00fe-d71c-ffffba1e5675f352",
+    "gabinet": "1dbd1f79-031e-9ee5-ffffba1e5675f352",
+    "garderoba": "1db9e18d-007c-3e37-ffffba1e5675f352",
+    "korytarz dol": "1c6685f6-02a4-3bc0-ffffba1e5675f352",
+    "korytarz gora": "1dbd2d05-0227-ed46-ffffba1e5675f352",
+    "kuchnia": "1db9e174-0358-a125-ffffba1e5675f352",
+    "maciek": "1db7ed2e-03d9-9ec8-ffffba1e5675f352",
+    "salon": "1dbbcc92-01ab-5571-ffffba1e5675f352",
+    "stol": "1e144db2-0312-a5ad-ffffba1e5675f352",
+    "sypialnia": "1db9e05e-000c-e8aa-ffffba1e5675f352",
+    "toaleta dol": "1c6a8743-026d-df46-ffffba1e5675f352",
+    "toaleta gora": "1c7660b0-0005-0109-ffffba1e5675f352",
+    "lazienka gora": "1db8e327-02e5-e977-ffffba1e5675f352"
+}
+
 load_custom_config()
 
 def get_custom_tools_def(lang: str = "en") -> List[Dict[str, Any]]:
     is_pl = (lang == "pl")
     return [
+        # 0. Lighting control with whole-house & exclusion support
+        {
+            "type": "function",
+            "function": {
+                "name": "control_lights",
+                "description": (
+                    "Włączanie lub wyłączanie oświetlenia w jednym pomieszczeniu, wielu pomieszczeniach lub w całym domu, z opcją wykluczenia wybranych pokoi (np. 'wyłącz światła w całym domu oprócz korytarza')."
+                    if is_pl else
+                    "Turn on or off lighting in a specific room, multiple rooms, or whole house, with optional excluded rooms."
+                ),
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "room": {
+                            "type": "string",
+                            "description": "Room name (e.g. 'salon', 'kuchnia', 'gabinet') or 'all' / 'caly dom' for the whole house"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["on", "off", "bright"],
+                            "description": "Action: 'off' (turn off), 'on' or 'bright' (turn on)"
+                        },
+                        "exclude": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                            "description": "Rooms to skip/exclude (e.g. ['korytarz', 'korytarz dol'])"
+                        }
+                    },
+                    "required": ["action"]
+                }
+            }
+        },
         # 1. Ventilation with duration
         {
             "type": "function",
@@ -485,6 +533,47 @@ async def direct_miniserver_cmd(target_uuid: str, command: str) -> Dict[str, Any
 
 async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
     """Execute tool call with smart room/mood/hardware handling and fallback."""
+    # 0. Lighting control with whole-house & exclusion support
+    if name == "control_lights":
+        room = normalize_text(arguments.get("room", "") or "")
+        action = str(arguments.get("action", "off")).lower()
+        exclude_raw = arguments.get("exclude") or []
+        if isinstance(exclude_raw, str):
+            exclude_raw = [exclude_raw]
+        exclude = [normalize_text(e) for e in exclude_raw if e]
+
+        mood_id = 778 if action in ("off", "wylacz", "zgas") else 777
+
+        all_controllers = dict(DEFAULT_LIGHT_CONTROLLERS)
+        for r_k, r_cfg in LIGHT_MOODS.items():
+            if isinstance(r_cfg, dict) and "uuid" in r_cfg:
+                all_controllers[r_k] = r_cfg["uuid"]
+
+        is_all = not room or room in ("all", "caly dom", "dom", "wszystko", "wszystkie", "caly", "domu")
+
+        targets = []
+        for r_name, u in all_controllers.items():
+            norm_r = normalize_text(r_name)
+            # Check exclusions
+            if any(ex in norm_r or norm_r in ex for ex in exclude):
+                logger.info(f"Skipping room '{r_name}' due to exclusion ({exclude})")
+                continue
+            if is_all or room in norm_r or norm_r in room:
+                targets.append((r_name, u))
+
+        results = []
+        for r_name, u in targets:
+            res = await direct_miniserver_cmd(u, f"changeTo/{mood_id}")
+            results.append({"room": r_name, "command": f"changeTo/{mood_id}", "result": res})
+
+        return {
+            "success": True,
+            "action": action,
+            "mood_id": mood_id,
+            "affected_rooms": [r[0] for r in targets],
+            "results": results
+        }
+
     # 1. Custom handling for ventilation with duration support
     if name == "control_ventilation":
         action = arguments.get("action", "auto")
