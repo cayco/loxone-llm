@@ -126,8 +126,14 @@ DEFAULT_FALLBACK_TEXT = {
     "pl": "Wykonano polecenie."
 }
 
-def normalize_text(text: str) -> str:
+def normalize_text(text: Any) -> str:
     """Normalize text by converting to lowercase and stripping Polish diacritics."""
+    if text is None:
+        return ""
+    if isinstance(text, bool):
+        return "off" if not text else "on"
+    if not isinstance(text, str):
+        text = str(text)
     replacements = {
         "ą": "a", "ć": "c", "ę": "e", "ł": "l", "ń": "n",
         "ó": "o", "ś": "s", "ź": "z", "ż": "z",
@@ -536,13 +542,20 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
     # 0. Lighting control with whole-house & exclusion support
     if name == "control_lights":
         room = normalize_text(arguments.get("room", "") or "")
-        action = str(arguments.get("action", "off")).lower()
+        action_raw = arguments.get("action")
+        if action_raw is False or action_raw == 0:
+            action = "off"
+        elif action_raw is True or action_raw == 1:
+            action = "on"
+        else:
+            action = normalize_text(str(action_raw or "off"))
+
         exclude_raw = arguments.get("exclude") or []
         if isinstance(exclude_raw, str):
             exclude_raw = [exclude_raw]
         exclude = [normalize_text(e) for e in exclude_raw if e]
 
-        mood_id = 778 if action in ("off", "wylacz", "zgas") else 777
+        mood_id = 778 if action in ("off", "false", "0", "wylacz", "zgas", "disable", "nie", "stop") else 777
 
         all_controllers = dict(DEFAULT_LIGHT_CONTROLLERS)
         for r_k, r_cfg in LIGHT_MOODS.items():
@@ -758,21 +771,38 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
     # 9. Scene / Mood activation handling (Gen 2 LightControllerV2 ID mapping)
     if name == "activate_scene":
         scene_raw = arguments.get("scene", "")
+        if scene_raw is False or scene_raw == 0:
+            scene_raw = "off"
+        elif scene_raw is True or scene_raw == 1:
+            scene_raw = "bright"
         room_raw = arguments.get("room", "")
         norm_scene = normalize_text(scene_raw)
         norm_room = normalize_text(room_raw)
 
-        # Check if room is in LIGHT_MOODS
+        # Check if room is in LIGHT_MOODS or DEFAULT_LIGHT_CONTROLLERS
         matched_room_key = None
         for r_key in LIGHT_MOODS:
             if r_key in norm_room or norm_room in r_key:
                 matched_room_key = r_key
                 break
 
+        if not matched_room_key:
+            for r_key in DEFAULT_LIGHT_CONTROLLERS:
+                if r_key in norm_room or norm_room in r_key:
+                    matched_room_key = r_key
+                    break
+
         if matched_room_key:
-            controller = LIGHT_MOODS[matched_room_key]
-            ctrl_uuid = controller.get("uuid")
-            moods = controller.get("moods", {})
+            controller = LIGHT_MOODS.get(matched_room_key, {})
+            ctrl_uuid = controller.get("uuid") if isinstance(controller, dict) else None
+            if not ctrl_uuid:
+                ctrl_uuid = DEFAULT_LIGHT_CONTROLLERS.get(matched_room_key)
+
+            moods = controller.get("moods", {}) if isinstance(controller, dict) else {}
+            if "off" not in moods: moods["off"] = 778
+            if "wylacz" not in moods: moods["wylacz"] = 778
+            if "bright" not in moods: moods["bright"] = 777
+            if "jasno" not in moods: moods["jasno"] = 777
 
             # Find matching mood
             mood_id = None
@@ -780,6 +810,11 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
                 if m_name in norm_scene or norm_scene in m_name:
                     mood_id = m_id
                     break
+
+            if mood_id is None and norm_scene in ("off", "false", "0", "wylacz", "zgas"):
+                mood_id = 778
+            elif mood_id is None and norm_scene in ("on", "true", "1", "bright", "jasno"):
+                mood_id = 777
 
             if mood_id is not None and ctrl_uuid:
                 logger.info(f"Resolved scene '{scene_raw}' in room '{matched_room_key}' to mood ID {mood_id}")
@@ -792,6 +827,7 @@ async def execute_mcp_tool(name: str, arguments: Dict[str, Any]) -> Any:
                     "controller_uuid": ctrl_uuid,
                     "miniserver_response": res
                 }
+
 
     # 10. Standard MCP tool execution
     result = await call_mcp_raw(name, arguments)
