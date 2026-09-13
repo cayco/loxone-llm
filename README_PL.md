@@ -1,6 +1,6 @@
 # Loxone LLM Bridge 🏠🤖
 
-> Mostek AI Agent (kompatybilny z OpenAI) dla Loxone Miniserver, umożliwiający naturalne sterowanie głosowe i tekstowe w języku polskim za pośrednictwem Home Assistant, Siri, Skrótów iOS oraz Apple Watch.
+> Mostek AI Agent (kompatybilny z OpenAI) dla Loxone Miniserver, umożliwiający naturalne sterowanie głosowe i tekstowe w języku polskim oraz angielskim za pośrednictwem Home Assistant, Siri, Skrótów iOS oraz Apple Watch.
 
 [English (EN)](README.md) | [Polski (PL)](README_PL.md)
 
@@ -23,7 +23,7 @@ flowchart TD
 
     subgraph HomeAssistant["Home Assistant"]
         HACore["Home Assistant Core"]
-        VoiceAssist["Potok Voice Assist (Polski)"]
+        VoiceAssist["Potok Voice Assist (Polski / Angielski)"]
         LiteLLM["Integracja konwersacyjna LiteLLM"]
     end
 
@@ -41,7 +41,7 @@ flowchart TD
     end
 
     Siri -->|Głos / Tekst| VoiceAssist
-    Watch -->|Natywne audio po polsku| VoiceAssist
+    Watch -->|Natywne audio| VoiceAssist
     ActionButton -->|Bezpośredni skrót| VoiceAssist
     VoiceAssist --> LiteLLM
     LiteLLM -->|API OpenAI HTTP /v1| Bridge
@@ -55,7 +55,10 @@ flowchart TD
 
 ## ✨ Funkcje
 
-- **🗣️ Naturalna polska mowa**: Prompty systemowe i formatowanie odpowiedzi dostosowane specjalnie pod syntezatory mowy (czysty tekst bez gwiazdek markdown, hashy czy tabel).
+- **🌐 Wsparcie wielojęzyczne**:
+  - Domyślny język angielski (`LANGUAGE=en`).
+  - Natywna obsługa języka polskiego (`LANGUAGE=pl`).
+  - Prompty i formatowanie odpowiedzi dostosowane pod syntezatory mowy (czysty tekst bez gwiazdek markdown, hashy czy tabel).
 - **💡 Inteligentne oświetlenie i nastroje Gen 2**:
   - Sterowanie na poziomie pomieszczenia: *„Włącz światło w salonie”*, *„Zgaś światła w sypialni”*.
   - Pełne wsparcie dla predefiniowanych scen i nastrojów Loxone Gen 2 (`LightControllerV2`): *„Wieczór w salonie”*, *„Noc w sypialni”*, *„Tryb jedzenie w salonie”*, *„Xbox w salonie”*, *„Jasno w kuchni”*.
@@ -71,7 +74,7 @@ flowchart TD
   - Pomiar temperatury, wilgotności i regulatory pokojowe: *„Jaka jest temperatura w gabinecie?”*.
 - **🔒 Bezpieczeństwo i prywatność**:
   - Dane logowania do Miniservera pozostają wyłącznie w Twojej sieci lokalnej.
-  - Pełna konfiguracja przez zmienne środowiskowe (`.env`).
+  - Pełna konfiguracja przez zmienne środowiskowe (`.env`). Żadne hasła ani loginy nie są na stałe w kodzie.
 
 ---
 
@@ -100,7 +103,7 @@ cp target/release/loxone-mcp-server /usr/local/bin/
 Utwórz plik konfiguracyjny `/etc/mcp-loxone/mcp-loxone.env`:
 ```ini
 LOXONE_HOST=192.168.1.100
-LOXONE_USER=admin
+LOXONE_USER=twoja_nazwa_uzytkownika
 LOXONE_PASS=twoje_haslo_loxone
 ```
 
@@ -127,12 +130,13 @@ pip install -r requirements.txt
 
 Utwórz plik konfiguracyjny `/etc/loxone-agent/agent.env`:
 ```ini
-GEMINI_API_KEY=AIzaSy...twoj_klucz_gemini...
+GEMINI_API_KEY=twoj_klucz_gemini_api
 GEMINI_MODEL=gemini-3.6-flash
+LANGUAGE=pl
 PORT=8000
 MCP_URL=http://127.0.0.1:3001/mcp
 LOXONE_HOST=192.168.1.100
-LOXONE_USER=admin
+LOXONE_USER=twoja_nazwa_uzytkownika
 LOXONE_PASS=twoje_haslo_loxone
 ```
 
@@ -150,6 +154,56 @@ curl http://127.0.0.1:8000/v1/models
 
 ---
 
+## 🔍 Jak znaleźć ID nastrojów i UUID bloków Loxone
+
+W blokach Loxone Gen 2 (`LightControllerV2`) zmiana nastroju wymaga podania numerycznego ID poprzez komendę `changeTo/<id>` (np. `changeTo/1` dla Wieczoru, `changeTo/2` dla Jedzenia). Standardowe wbudowane tryby Loxone mają ID:
+- **`777`**: Jasno / Pełne włączenie (`jasno` / `bright`)
+- **`778`**: Wyłączenie (`wyłącz` / `off`)
+
+Aby odnaleźć ID i UUID w Twojej instalacji:
+
+### Metoda 1: Odczyt struktury JSON w przeglądarce
+Wpisz w przeglądarce adres Miniservera z danymi logowania:
+```
+http://<LOXONE_USER>:<LOXONE_PASS>@<LOXONE_HOST>/data/LoxAPP3.json
+```
+1. Wyszukaj w pliku ciąg `"type": "LightControllerV2"`.
+2. Odszukaj kontroler oświetlenia danego pokoju (np. Salon).
+3. UUID bloku znajduje się w polu `"uuidAction"` (np. `1dbbcc92-01ab-5571-ffffba1e5675f352`).
+4. W sekcji `"details"` znajdziesz tablicę `"moods"` z obiektami posiadającymi pola `"id"` (np. `1`, `2`, `3`) oraz `"name"` (np. `"Wieczór"`, `"Jedzenie"`, `"Xbox"`).
+
+### Metoda 2: Sprawdzenie w Loxone Config
+1. Otwórz projekt w programie **Loxone Config**.
+2. Kliknij blok **Sterownik oświetlenia V2** (Light Controller V2) wybranego pomieszczenia.
+3. W oknie konfiguracji nastrojów każdy nastrój ma przypisany numeryczny numer pozycji.
+4. UUID bloku widoczne jest w dolnym panelu właściwości w sekcji **Identyfikacja**.
+
+### Konfiguracja `moods.json`
+Skopiuj plik [`moods.example.json`](moods.example.json) do `moods.json` i uzupełnij go odnalezionymi identyfikatorami:
+```json
+{
+  "light_moods": {
+    "salon": {
+      "uuid": "TUTAJ_UUID_STEROWNIKA_OSWIETLENIA",
+      "moods": {
+        "jasno": 777,
+        "wylacz": 778,
+        "wieczor": 1,
+        "jedzenie": 2,
+        "noc": 3,
+        "xbox": 4
+      }
+    }
+  },
+  "ventilation_controls": {
+    "gabinet": "TUTAJ_UUID_WENTYLACJI",
+    "kuchnia": "TUTAJ_UUID_WENTYLACJI"
+  }
+}
+```
+
+---
+
 ## 🏡 Konfiguracja w Home Assistant
 
 1. W Home Assistant przejdź do **Ustawienia** $\rightarrow$ **Urządzenia oraz usługi** $\rightarrow$ **Dodaj integrację**.
@@ -159,18 +213,16 @@ curl http://127.0.0.1:8000/v1/models
    - **API Key**: `dummy` (lub dowolny ciąg znaków)
 4. Przejdź do **Ustawienia** $\rightarrow$ **Asystenci głosowi** $\rightarrow$ **Home Assistant**:
    - Ustaw **Agent konwersacji** na **LiteLLM**.
-   - Ustaw **Język** na **Polski**.
+   - Ustaw **Język** na preferowany (np. **Polski** lub **Angielski**).
 
 ---
 
 ## 📱 Konfiguracja iOS, Siri i Apple Watch
 
-Ponieważ Apple Siri nie obsługuje natywnie języka polskiego jako głównego asystenta, wywołanie Siri przyciskiem bocznym powoduje domyślne rozpoznawanie mowy w języku angielskim. Aby wygodnie i bezbłędnie dyktować po polsku:
-
 ### Opcja A: Komplikacja Assist na Apple Watch (Rekomendowane na zegarek)
 1. Zainstaluj aplikację **Home Assistant** na Apple Watch.
 2. Dodaj komplikację **Assist** do tarczy zegarka.
-3. Dotknięcie komplikacji od razu otwiera natywny mikrofon słuchający w języku polskim i przesyła komendę bezpośrednio do agenta.
+3. Dotknięcie komplikacji od razu otwiera natywny mikrofon słuchający w Twoim języku i przesyła komendę bezpośrednio do agenta.
 
 ### Opcja B: Przycisk Akcji iPhone / Stuknięcie w tył
 1. Na iPhone 15 Pro / 16: Przejdź do **Ustawienia** $\rightarrow$ **Przycisk czynności** $\rightarrow$ przypisz Skrót uruchamiający Asystenta Home Assistant (Assist).

@@ -2,7 +2,7 @@
 """
 Loxone LLM Bridge (OpenAI-compatible Agent for Home Assistant & Siri)
 Enables voice control of Loxone Miniservers using LLMs (Google Gemini / OpenAI)
-and MCP (Model Context Protocol).
+and MCP (Model Context Protocol). Supports English (default) and Polish.
 """
 
 import os
@@ -29,9 +29,10 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.6-flash")
 MCP_URL = os.getenv("MCP_URL", "http://127.0.0.1:3001/mcp")
 PORT = int(os.getenv("PORT", "8000"))
+DEFAULT_LANGUAGE = os.getenv("LANGUAGE", "en").lower().strip()
 
 LOX_HOST = os.getenv("LOXONE_HOST", "127.0.0.1")
-LOX_USER = os.getenv("LOXONE_USER", "admin")
+LOX_USER = os.getenv("LOXONE_USER", "")
 LOX_PASS = os.getenv("LOXONE_PASS", "")
 
 # Check optional fallback env files if present
@@ -47,31 +48,57 @@ for env_file in ["/etc/loxone-agent/agent.env", "/etc/mcp-loxone/mcp-loxone.env"
                         elif k == "GEMINI_MODEL" and not os.getenv("GEMINI_MODEL"): GEMINI_MODEL = clean_v
                         elif k == "MCP_URL" and not os.getenv("MCP_URL"): MCP_URL = clean_v
                         elif k == "LOXONE_HOST" and not os.getenv("LOXONE_HOST"): LOX_HOST = clean_v
-                        elif k == "LOXONE_USER" and not os.getenv("LOXONE_USER"): LOX_USER = clean_v
+                        elif k == "LOXONE_USER" and not LOX_USER: LOX_USER = clean_v
                         elif k == "LOXONE_PASS" and not os.getenv("LOXONE_PASS"): LOX_PASS = clean_v
+                        elif k == "LANGUAGE" and not os.getenv("LANGUAGE"): DEFAULT_LANGUAGE = clean_v.lower().strip()
         except Exception as e:
             logger.warning(f"Could not read {env_file}: {e}")
 
 app = FastAPI(title="Loxone LLM Agent Bridge")
 gemini_client: Optional[AsyncOpenAI] = None
 
-SYSTEM_INSTRUCTION = (
-    "Jestes inteligentnym asystentem inteligentnego domu Loxone o nazwie Dom. "
-    "Odpowiadasz uzytkownikowi i sterujesz domem za pomoca dostepnych narzedzi Loxone. "
-    "Zasady: "
-    "1. Odpowiadaj zawsze w jezyku polskim. "
-    "2. Odpowiedz bedzie czytana na glos przez syntezator mowy w telefonie, wiec powinna byc naturalna, zwiezla i konkretna. "
-    "3. Nie uzywaj formatowania markdown (gwiazdek, pogrubien, tabel, list). "
-    "4. Gdy uzytkownik prosi o akcje, ZAWSZE najpierw wywolaj odpowiednie narzedzie: "
-    "   - wlaczenie/wylaczenie/sciemnienie swiatla: control_lights "
-    "   - wlaczenie nastroju/trybu swiatla (np. 'wieczor w salonie', 'noc', 'jedzenie', 'xbox', 'jasno', 'zasypianie', 'pobudka'): activate_scene(scene=..., room=...) "
-    "   - sterowanie roletami/zaluzjami: control_blinds "
-    "   - sterowanie wentylacja/rekuperacja/wietrzeniem: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
-    "   - ustawienie temperatury: set_temperature "
-    "5. Gdy uzytkownik prosi o wietrzenie lub zmiane wentylacji na okreslony czas (np. 'na 20 minut', 'na pol godziny', 'na godzine', 'na 2 godziny'), ZAWSZE podaj ten czas w duration_minutes. "
-    "6. Informacje o stanie okien, drzwi, energii i czujnikach sa dostepne w get_sensor_readings. "
-    "7. Zawsze na koniec odpowiedz krotkim zdaniem potwierdzajacym wykonanie akcji (np. 'Wlaczylem wietrzenie w kuchni na 30 minut.', 'Wlaczylem tryb wieczor w salonie.')."
-)
+# System Instructions by language
+SYSTEM_INSTRUCTIONS = {
+    "en": (
+        "You are an intelligent smart home assistant for a Loxone smart home named Home. "
+        "You respond to the user and control the home using available Loxone tools. "
+        "Rules: "
+        "1. Always respond in English. "
+        "2. Responses will be read aloud by a phone/watch text-to-speech engine, so keep them natural, brief, and concise. "
+        "3. Do not use markdown formatting (no asterisks, bolding, tables, or numbered lists). "
+        "4. When the user requests an action, ALWAYS call the appropriate tool first: "
+        "   - turn on/off or dim lights: control_lights "
+        "   - activate lighting mood or scene (e.g. 'evening in living room', 'night', 'dining', 'xbox', 'bright', 'relax'): activate_scene(scene=..., room=...) "
+        "   - control blinds/shading/shutters: control_blinds "
+        "   - control ventilation/airing/recuperation: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
+        "   - set target temperature: set_temperature "
+        "5. When the user asks for airing or changing ventilation for a specific duration (e.g. 'for 20 minutes', 'for half an hour', 'for an hour', 'for 2 hours'), ALWAYS specify that in duration_minutes. "
+        "6. Sensor, energy, window, and door information is available in get_sensor_readings. "
+        "7. Always conclude with a single short spoken confirmation sentence (e.g. 'Turned on kitchen ventilation for 30 minutes.', 'Activated evening mood in the living room.')."
+    ),
+    "pl": (
+        "Jestes inteligentnym asystentem inteligentnego domu Loxone o nazwie Dom. "
+        "Odpowiadasz uzytkownikowi i sterujesz domem za pomoca dostepnych narzedzi Loxone. "
+        "Zasady: "
+        "1. Odpowiadaj zawsze w jezyku polskim. "
+        "2. Odpowiedz bedzie czytana na glos przez syntezator mowy w telefonie, wiec powinna byc naturalna, zwiezla i konkretna. "
+        "3. Nie uzywaj formatowania markdown (gwiazdek, pogrubien, tabel, list). "
+        "4. Gdy uzytkownik prosi o akcje, ZAWSZE najpierw wywolaj odpowiednie narzedzie: "
+        "   - wlaczenie/wylaczenie/sciemnienie swiatla: control_lights "
+        "   - wlaczenie nastroju/trybu swiatla (np. 'wieczor w salonie', 'noc', 'jedzenie', 'xbox', 'jasno', 'zasypianie', 'pobudka'): activate_scene(scene=..., room=...) "
+        "   - sterowanie roletami/zaluzjami: control_blinds "
+        "   - sterowanie wentylacja/rekuperacja/wietrzeniem: control_ventilation(action=..., room=..., duration_minutes=..., speed=...) "
+        "   - ustawienie temperatury: set_temperature "
+        "5. Gdy uzytkownik prosi o wietrzenie lub zmiane wentylacji na okreslony czas (np. 'na 20 minut', 'na pol godziny', 'na godzine', 'na 2 godziny'), ZAWSZE podaj ten czas w duration_minutes. "
+        "6. Informacje o stanie okien, drzwi, energii i czujnikach sa dostepne w get_sensor_readings. "
+        "7. Zawsze na koniec odpowiedz krotkim zdaniem potwierdzajacym wykonanie akcji (np. 'Wlaczylem wietrzenie w kuchni na 30 minut.', 'Wlaczylem tryb wieczor w salonie.')."
+    )
+}
+
+DEFAULT_FALLBACK_TEXT = {
+    "en": "Command executed.",
+    "pl": "Wykonano polecenie."
+}
 
 def normalize_text(text: str) -> str:
     """Normalize text by converting to lowercase and stripping Polish diacritics."""
@@ -101,39 +128,72 @@ if os.path.exists(CONFIG_MOODS_FILE):
     except Exception as e:
         logger.warning(f"Failed to load {CONFIG_MOODS_FILE}: {e}")
 
-# Tool definition for Ventilation control with duration
-VENTILATION_TOOL_DEF = {
-    "type": "function",
-    "function": {
-        "name": "control_ventilation",
-        "description": "Sterowanie wentylacją i rekuperacją w pomieszczeniach lub w całym domu z możliwością określenia czasu trwania. Obsługuje intensywne wietrzenie (boost/airing), spoczynek/wyłączenie (off/resting), powrót do trybu automatycznego (auto) oraz ustawienie konkretnej prędkości w procentach (set_speed).",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "room": {
-                    "type": "string",
-                    "description": "Nazwa pomieszczenia (np. 'Gabinet', 'Kuchnia', 'Sypialnia') lub 'all' / brak dla wszystkich pomieszczeń"
-                },
-                "action": {
-                    "type": "string",
-                    "enum": ["boost", "airing", "off", "resting", "auto", "set_speed"],
-                    "description": "Akcja wentylacji: boost/airing (wietrzenie na 100%), off/resting (wyłączenie), auto (tryb automatyczny), set_speed (prędkość w %)"
-                },
-                "duration_minutes": {
-                    "type": "integer",
-                    "description": "Czas trwania akcji w minutach (np. 15, 20, 30, 45, 60 dla 1h, 120 dla 2h). Domyślnie 15 minut dla wietrzenia, 60 minut dla set_speed, 120 minut dla off."
-                },
-                "speed": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 100,
-                    "description": "Prędkość wentylatora w procentach (0-100) dla akcji set_speed"
+def get_ventilation_tool_def(lang: str = "en") -> Dict[str, Any]:
+    if lang == "pl":
+        return {
+            "type": "function",
+            "function": {
+                "name": "control_ventilation",
+                "description": "Sterowanie wentylacją i rekuperacją w pomieszczeniach lub w całym domu z możliwością określenia czasu trwania. Obsługuje intensywne wietrzenie (boost/airing), spoczynek/wyłączenie (off/resting), powrót do trybu automatycznego (auto) oraz ustawienie konkretnej prędkości w procentach (set_speed).",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "room": {
+                            "type": "string",
+                            "description": "Nazwa pomieszczenia (np. 'Gabinet', 'Kuchnia', 'Sypialnia') lub 'all' / brak dla wszystkich pomieszczeń"
+                        },
+                        "action": {
+                            "type": "string",
+                            "enum": ["boost", "airing", "off", "resting", "auto", "set_speed"],
+                            "description": "Akcja wentylacji: boost/airing (wietrzenie na 100%), off/resting (wyłączenie), auto (tryb automatyczny), set_speed (prędkość w %)"
+                        },
+                        "duration_minutes": {
+                            "type": "integer",
+                            "description": "Czas trwania akcji w minutach (np. 15, 20, 30, 45, 60 dla 1h, 120 dla 2h). Domyślnie 15 minut dla wietrzenia, 60 minut dla set_speed, 120 minut dla off."
+                        },
+                        "speed": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 100,
+                            "description": "Prędkość wentylatora w procentach (0-100) dla akcji set_speed"
+                        }
+                    },
+                    "required": ["action"]
                 }
-            },
-            "required": ["action"]
+            }
+        }
+    return {
+        "type": "function",
+        "function": {
+            "name": "control_ventilation",
+            "description": "Control ventilation and recuperation units by room or whole house with optional duration timer. Supports boost/airing, off/resting, auto/reset mode, and set_speed in percent.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "room": {
+                        "type": "string",
+                        "description": "Room name (e.g. 'Office', 'Kitchen', 'Bedroom') or 'all' / omitted for all units"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["boost", "airing", "off", "resting", "auto", "set_speed"],
+                        "description": "Ventilation action: boost/airing (100% boost), off/resting (turn off), auto (automatic mode), set_speed (custom percentage)"
+                    },
+                    "duration_minutes": {
+                        "type": "integer",
+                        "description": "Duration in minutes (e.g. 15, 20, 30, 45, 60 for 1h, 120 for 2h). Default is 15 min for airing, 60 min for speed, 120 min for off."
+                    },
+                    "speed": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 100,
+                        "description": "Fan speed percentage (0-100) for set_speed action"
+                    }
+                },
+                "required": ["action"]
+            }
         }
     }
-}
 
 def get_client() -> AsyncOpenAI:
     global gemini_client
@@ -147,7 +207,7 @@ def get_client() -> AsyncOpenAI:
         )
     return gemini_client
 
-async def fetch_mcp_tools() -> List[Dict[str, Any]]:
+async def fetch_mcp_tools(lang: str = "en") -> List[Dict[str, Any]]:
     """Fetch available tools from the local Loxone MCP server."""
     async with httpx.AsyncClient(timeout=10.0) as client:
         payload = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}
@@ -167,7 +227,7 @@ async def fetch_mcp_tools() -> List[Dict[str, Any]]:
                 }
             })
         # Add custom ventilation tool
-        openai_tools.append(VENTILATION_TOOL_DEF)
+        openai_tools.append(get_ventilation_tool_def(lang))
         return openai_tools
 
 async def call_mcp_raw(name: str, arguments: Dict[str, Any]) -> Any:
@@ -330,14 +390,21 @@ async def chat_completions(req: Request):
     if model in ("loxone-ai", "default", "gemini-2.5-flash", None, ""):
         model = "gemini-3.6-flash"
         
+    # Check language override in request or fallback to server default
+    lang = body.get("language", DEFAULT_LANGUAGE)
+    if lang not in SYSTEM_INSTRUCTIONS:
+        lang = "en"
+
+    sys_instruction = SYSTEM_INSTRUCTIONS.get(lang, SYSTEM_INSTRUCTIONS["en"])
+
     messages = body.get("messages", [])
     if not messages or messages[0].get("role") != "system":
-        messages.insert(0, {"role": "system", "content": SYSTEM_INSTRUCTION})
+        messages.insert(0, {"role": "system", "content": sys_instruction})
     else:
-        messages[0]["content"] = SYSTEM_INSTRUCTION + "\n" + messages[0]["content"]
+        messages[0]["content"] = sys_instruction + "\n" + messages[0]["content"]
 
     client = get_client()
-    tools = await fetch_mcp_tools()
+    tools = await fetch_mcp_tools(lang=lang)
     
     current_messages = list(messages)
     max_turns = 6
@@ -384,7 +451,8 @@ async def chat_completions(req: Request):
             model=model,
             messages=current_messages
         )
-        final_content = summary_resp.choices[0].message.content or "Wykonano polecenie."
+        default_msg = DEFAULT_FALLBACK_TEXT.get(lang, DEFAULT_FALLBACK_TEXT["en"])
+        final_content = summary_resp.choices[0].message.content or default_msg
 
     return {
         "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
