@@ -191,11 +191,30 @@ http://<LOXONE_USER>:<LOXONE_PASS>@<LOXONE_HOST>/data/LoxAPP3.json
 
 ---
 
-## 🏡 Konfiguracja w Home Assistant
+## 🏡 Konfiguracja Home Assistant
 
+Home Assistant można połączyć z mostkiem na dwa elastyczne sposoby:
+
+### Opcja 1: Natywny Voice Assist z bezpośrednim wywoływaniem skryptów (Rekomendowane)
+W tym trybie nadrzędnym asystentem konwersacyjnym w HA jest natywny silnik LLM (np. Google Generative AI), co pozwala na bezpośrednie sterowanie encjami Home Assistant (np. samochodem Ford Ranger Raptor przez integrację FordPass) oraz delegowanie zadań Loxone do mostka przez endpoint narzędzi.
+
+1. Dodaj polecenie wywołania do `configuration.yaml` (lub `integrations/rest_command.yaml`):
+   ```yaml
+   rest_command:
+     loxone_action:
+       url: "http://<IP_MOSTKA>:8000/v1/tools/execute"
+       method: POST
+       headers:
+         Content-Type: "application/json"
+       payload: '{"name": "{{ name }}", "arguments": {{ arguments | to_json }} }'
+   ```
+
+2. Zarejestruj dedykowane skrypty w `scripts.yaml` (np. `przewietrz_gabinet`, `przewietrz_kuchnie`, `przewietrz_sypialnie` z parametrem `duration_minutes`, sceny oświetleniowe oraz komendy pojazdu). Upewnij się, że w ustawieniach Assist mają włączone `should_expose: true`.
+
+### Opcja 2: Integracja konwersacyjna LiteLLM (OpenAI API)
 1. W Home Assistant przejdź do **Ustawienia** $\rightarrow$ **Urządzenia oraz usługi** $\rightarrow$ **Dodaj integrację**.
 2. Wyszukaj **LiteLLM**.
-3. Wprowadź ustawienia połączenia:
+3. Wypełnij parametry połączenia:
    - **API Base**: `http://<IP_MOSTKA>:8000/v1`
    - **API Key**: `dummy` (lub dowolny ciąg znaków)
 4. Przejdź do **Ustawienia** $\rightarrow$ **Asystenci głosowi** $\rightarrow$ **Home Assistant**:

@@ -205,6 +205,25 @@ Copy [`moods.example.json`](moods.example.json) to `moods.json` and fill in your
 
 ## 🏡 Home Assistant Configuration
 
+You can connect Home Assistant to the bridge in two flexible ways:
+
+### Option 1: Native HA Voice Assist with Direct Script Execution (Recommended)
+This mode keeps Home Assistant's native LLM conversation engine (e.g. Google Generative AI) as the master assistant, allowing seamless voice control of native HA entities (e.g. Ford Ranger Raptor via FordPass) and delegating Loxone actions to the bridge.
+
+1. Add the bridge execution command to Home Assistant `configuration.yaml` (or `integrations/rest_command.yaml`):
+   ```yaml
+   rest_command:
+     loxone_action:
+       url: "http://<YOUR_BRIDGE_IP>:8000/v1/tools/execute"
+       method: POST
+       headers:
+         Content-Type: "application/json"
+       payload: '{"name": "{{ name }}", "arguments": {{ arguments | to_json }} }'
+   ```
+
+2. Expose dedicated voice scripts in `scripts.yaml` (e.g. `przewietrz_gabinet`, `przewietrz_kuchnie`, `przewietrz_sypialnie` with `duration_minutes`, scene triggers, and vehicle commands). Ensure they have `should_expose: true` in Assist settings.
+
+### Option 2: LiteLLM OpenAI Conversation Integration
 1. In Home Assistant, navigate to **Settings** $\rightarrow$ **Devices & Services** $\rightarrow$ **Add Integration**.
 2. Search for **LiteLLM**.
 3. Fill in the connection settings:
