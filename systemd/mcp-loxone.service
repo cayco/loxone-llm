@@ -1,0 +1,15 @@
+[Unit]
+Description=Loxone MCP Server (avrabe/mcp-loxone)
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/mcp-loxone
+EnvironmentFile=/etc/mcp-loxone/mcp-loxone.env
+ExecStart=/usr/local/bin/loxone-mcp-server http --port 3002 --enable-sse --enable-cors --insecure
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

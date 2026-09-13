@@ -1,0 +1,15 @@
+[Unit]
+Description=Loxone AI Agent Bridge (Gemini / OpenAI -> Loxone MCP)
+After=network.target mcp-loxone.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/loxone-agent
+EnvironmentFile=/etc/loxone-agent/agent.env
+ExecStart=/opt/loxone-agent/venv/bin/python /opt/loxone-agent/server.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

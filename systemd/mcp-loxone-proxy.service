@@ -1,0 +1,13 @@
+[Unit]
+Description=Loxone MCP Server Socket Proxy Service
+Requires=mcp-loxone-proxy.socket
+After=mcp-loxone-proxy.socket mcp-loxone.service
+
+[Service]
+Type=simple
+ExecStart=/lib/systemd/systemd-socket-proxyd 127.0.0.1:3002
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

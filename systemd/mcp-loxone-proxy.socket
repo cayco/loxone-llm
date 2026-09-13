@@ -1,0 +1,9 @@
+[Unit]
+Description=Loxone MCP Server Socket Proxy
+PartOf=mcp-loxone-proxy.service
+
+[Socket]
+ListenStream=0.0.0.0:3001
+
+[Install]
+WantedBy=sockets.target

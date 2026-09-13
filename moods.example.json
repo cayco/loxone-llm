@@ -1,0 +1,49 @@
+{
+  "light_moods": {
+    "salon": {
+      "uuid": "1dbbcc92-01ab-5571-ffffba1e5675f352",
+      "moods": {
+        "bright": 777,
+        "jasno": 777,
+        "pelne": 777,
+        "off": 778,
+        "wylacz": 778,
+        "wieczor": 1,
+        "jedzenie": 2,
+        "obiad": 2,
+        "kolacja": 2,
+        "noc": 3,
+        "xbox": 4,
+        "gry": 4
+      }
+    },
+    "sypialnia": {
+      "uuid": "1db9e05e-000c-e8aa-ffffba1e5675f352",
+      "moods": {
+        "bright": 777,
+        "jasno": 777,
+        "off": 778,
+        "wieczor": 1,
+        "ranek": 2,
+        "pobudka": 3,
+        "zasypianie": 4
+      }
+    },
+    "gabinet": {
+      "uuid": "1dbd1f79-031e-9ee5-ffffba1e5675f352",
+      "moods": {
+        "bright": 777,
+        "jasno": 777,
+        "off": 778,
+        "wieczor": 1,
+        "noc": 2,
+        "komputer": 3
+      }
+    }
+  },
+  "ventilation_controls": {
+    "gabinet": "1e58de28-006c-9572-ffffba1e5675f352",
+    "kuchnia": "1e6b4f7e-0264-5a76-ffffba1e5675f352",
+    "sypialnia": "1caad0b0-01cb-d5f3-ffff235f52b54327"
+  }
+}
